@@ -372,7 +372,11 @@ tr.owners td { background: var(--surface-2); }
 .pitch { border-radius: 12px; padding: 14px 8px 12px; display: grid; gap: 10px; background: repeating-linear-gradient(180deg, var(--pitch-a) 0 44px, var(--pitch-b) 44px 88px); border: 1px solid var(--pitch-line); }
 .pline { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; }
 .pline.bench { padding-top: 10px; border-top: 1px dashed var(--pitch-line); }
-.slot { position: relative; width: 84px; min-height: 64px; border: 1px solid var(--line); background: var(--surface); border-radius: 9px; padding: 6px 4px 5px; display: grid; gap: 3px; justify-items: center; align-content: start; text-align: center; font-size: 12px; }
+.slot { position: relative; width: 84px; min-height: 64px; border: 1px solid var(--line); background: var(--surface); border-radius: 9px; padding: 0 0 5px; display: grid; gap: 4px; justify-items: center; align-content: start; text-align: center; font-size: 12px; }
+.slot .kit { width: 100%; min-width: 0; display: grid; padding: 4px 3px 3px; background: var(--k1, var(--surface-2)); color: var(--kt, var(--ink)); border-bottom: 3px solid var(--k2, var(--line)); border-radius: 8px 8px 0 0; box-shadow: inset 0 0 0 1px rgb(0 0 0 / .08); }
+.slot .kit .code { font-size: 9.5px; font-weight: 800; letter-spacing: .06em; opacity: .85; }
+.slot .kit .n { font-size: 12px; font-weight: 700; }
+.slot .sv { display: inline-flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 3px 4px; padding: 0 3px; }
 button.slot:hover { border-color: var(--accent-strong); }
 button.slot { touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
 .slot.ghost { position: fixed; left: 0; top: 0; z-index: 90; pointer-events: none; cursor: grabbing; box-shadow: var(--shadow); border-color: var(--accent-strong); opacity: .95; }
@@ -386,12 +390,12 @@ button.slot.dragging { opacity: .3; }
 .slot .tm { font-size: 10.5px; font-weight: 700; color: var(--muted); letter-spacing: .04em; }
 .slot .n { font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .slot .s { font-weight: 700; font-variant-numeric: tabular-nums; }
-.slot .cv { position: absolute; top: -6px; left: -6px; }
-.slot .dot { position: absolute; top: 5px; right: 5px; }
+.slot .cv { position: absolute; top: -6px; left: -6px; z-index: 1; }
+.slot .dot { position: absolute; top: -3px; right: -3px; z-index: 1; width: 9px; height: 9px; box-shadow: 0 0 0 2px var(--surface); }
 .slot.new { border-color: var(--accent-strong); }
 @media (max-width: 420px) { .slot { width: 64px; font-size: 11px; } .pline { gap: 4px; } }
 .histchart { margin-top: 2px; }
-.msg { padding: 9px 12px; border-radius: 8px; font-size: 13.5px; background: var(--surface); border: 1px solid var(--line); display: flex; gap: 8px; align-items: baseline; }
+.msg { padding: 9px 12px; border-radius: 8px; font-size: 13.5px; background: var(--surface); border: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
 .msg.err { border-color: var(--bad); color: var(--bad); }
 .msg.warn { border-color: var(--warn); }
 .msg.warn b { color: var(--warn); }
@@ -1411,10 +1415,10 @@ function pitchHTML(s, opts = {}) {
     const p = P.get(id); if (!p) return '';
     const tag = opts.edit ? 'button' : 'div';
     const cv = id === s.c ? '<span class="cv">C</span>' : id === s.vc ? '<span class="cv v">V</span>' : '';
-    const sub = s.subIn.has(id) ? '<span class="subi in">▲ sub</span>' : s.subOut.has(id) ? '<span class="subi out">▼ sub</span>' : '';
-    const val = isPlan ? `<span>${fxNext(p, META.next)} <span class="s" title="Expected points (${esc(xpLabel())})">${xpOf(id).toFixed(1)}</span></span>` : `<span class="s">${ptsOf(s, id)} pts</span>`;
+    const sub = isPlan || !s.subIn ? '' : s.subIn.has(id) ? '<span class="subi in">▲ sub</span>' : s.subOut.has(id) ? '<span class="subi out">▼ sub</span>' : '';
+    const val = isPlan ? `<span class="sv">${fxNext(p, META.next)}<span class="s" title="Expected points (${esc(xpLabel())})">${xpOf(id).toFixed(1)}</span></span>` : `<span class="sv"><span class="s">${ptsOf(s, id)} pts</span></span>`;
     const cls = ['slot', i >= 11 ? 'bench' : '', opts.sel === i ? 'sel' : '', opts.changed && opts.changed.has(id) ? 'new' : ''].filter(Boolean).join(' ');
-    return `<${tag} class="${cls}" ${opts.edit ? `data-action="slot" data-i="${i}" aria-label="${esc(p.name)}, ${POS_LONG[p.pos]}${i >= 11 ? ', bench' : ''}"` : `title="${esc(p.name)} · ${esc((T.get(p.team) || {}).name || '')}${p.flag ? ' · ' + esc(p.flag.news || p.flag.label) : ''}"`}>${cv}${flagDot(p)}<span class="tm">${tshort(p.team)} · ${POS[p.pos]}</span><span class="n">${esc(p.name)}</span>${val}${sub}</${tag}>`;
+    return `<${tag} class="${cls}" style="${kitVars(p.team)}" ${opts.edit ? `data-action="slot" data-i="${i}" aria-label="${esc(p.name)}, ${POS_LONG[p.pos]}${i >= 11 ? ', bench' : ''}"` : `title="${esc(p.name)} · ${esc((T.get(p.team) || {}).name || '')}${p.flag ? ' · ' + esc(p.flag.news || p.flag.label) : ''}"`}>${cv}${flagDot(p)}<span class="kit"><span class="code">${tshort(p.team)} · ${POS[p.pos]}</span><span class="n">${esc(p.name)}</span></span>${val}${sub}</${tag}>`;
   };
   const lines = [1, 2, 3, 4].map(pos => `<div class="pline">${starters.map((id, i) => [id, i]).filter(([id]) => (P.get(id) || {}).pos === pos).map(([id, i]) => slot(id, i)).join('')}</div>`);
   lines.push(`<div class="pline bench" aria-label="Bench">${bench.map((id, j) => slot(id, 11 + j)).join('')}</div>`);
@@ -1434,8 +1438,14 @@ function mgrHTML() {
   const fplUrl = `https://fantasy.premierleague.com/entry/${m.id}/event/${META.gw}`;
   let squad;
   if (view === 'plan') {
-    squad = plan ? `${plan.note || plan.chip ? `<div class="msg">${plan.chip ? `<span class="tag gold">${esc(chipLong(plan.chip))}</span>` : ''}<span>${esc(plan.note || '')}</span></div>` : ''}${pitchHTML(ps)}<p class="muted" style="margin:0;font-size:12.5px">${plan.src === 'screenshot' ? 'Read from a screenshot' : 'Entered'} and saved ${esc(fmtWhen(plan.at))}. FPL’s real GW${plan.gw} team replaces it after the deadline sync.</p>`
-      : `<div class="empty-state" style="padding:24px">No GW${META.next} lineup yet. Their GW${META.gw} team carries over until someone uploads a screenshot or enters the changes they shared.</div>`;
+    const xpLine = `<span class="muted">GW${META.next} xP</span> <b class="num">${projected(lineupView(m), META.next).toFixed(1)}</b>${hitOf(plan) ? ` <span class="hit">${fmtHit(hitOf(plan))}</span>` : ''}`;
+    if (plan) {
+      squad = `<div class="msg">${plan.chip ? `<span class="tag gold">${esc(chipLong(plan.chip))}</span>` : ''}${plan.note ? `<span>${esc(plan.note)}</span>` : ''}<span style="margin-left:auto">${xpLine}</span></div>${pitchHTML(ps)}<p class="muted" style="margin:0;font-size:12.5px">${plan.src === 'screenshot' ? 'Read from a screenshot' : 'Entered'} and saved ${esc(fmtWhen(plan.at))}. FPL’s real GW${plan.gw} team replaces it after the deadline sync.</p>`;
+    } else {
+      const best = lineupView(m);
+      squad = best ? `<div class="msg"><span>Their GW${META.gw} squad, set up as the best XI and captain by ${esc(xpLabel())} expected points.</span><span style="margin-left:auto">${xpLine}</span></div>${pitchHTML(best, { plan: true })}<p class="muted" style="margin:0;font-size:12.5px">If they’ve made transfers, upload their screenshot or edit the lineup.</p>`
+        : `<div class="empty-state" style="padding:24px">No GW${META.gw} team on FPL for this manager.</div>`;
+    }
   } else {
     squad = s ? pitchHTML(s) : `<div class="empty-state" style="padding:24px">No GW${META.gw} team on FPL for this manager.</div>`;
   }
@@ -1468,7 +1478,7 @@ function mgrHTML() {
 /* ================= Sheet: plan editor ================= */
 function startEdit() {
   const m = findM(S.sheet.id); const plan = planOf(m);
-  const base = plan ? planSquad(plan) : m.actual;
+  const base = plan ? planSquad(plan) : lineupView(m);
   S.sheet.edit = { ids: [...base.ids], c: base.c, vc: base.vc, chip: plan ? (plan.chip || '') : '', note: plan ? (plan.note || '') : '', orig: new Set(m.actual.ids), src: 'manual', hit: plan ? (+plan.hit || 0) : 0 };
   S.sheet.slot = null; S.sheet.picker = false; S.sheet.pq = '';
   renderSheet();
