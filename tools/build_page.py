@@ -18,7 +18,7 @@ script_at = body.index('<script>')
 body = body[:script_at] + '<script src="config.js"></script>\n<script src="backend.js"></script>\n' + body[script_at:]
 
 SITE = 'https://zidanes-floor.github.io/vote/'
-DESC = "Murder on Zidane's Floor — SKLW FPL club squad room: table, GW lineups with expected points, votes and head-to-heads for all 16 managers."
+DESC = "Murder on Zidane's Floor — SKLW FPL team squad room: table, GW lineups with expected points, votes and head-to-heads for all 16 managers."
 doc = f'''<!doctype html>
 <html lang="en">
 <head>

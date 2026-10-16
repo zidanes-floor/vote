@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#0B0920">
-<meta name="description" content="Murder on Zidane's Floor — SKLW FPL club squad room: table, GW lineups with expected points, votes and head-to-heads for all 16 managers.">
+<meta name="description" content="Murder on Zidane's Floor — SKLW FPL team squad room: table, GW lineups with expected points, votes and head-to-heads for all 16 managers.">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Zidane's Floor Squad Room">
-<meta property="og:description" content="Murder on Zidane's Floor — SKLW FPL club squad room: table, GW lineups with expected points, votes and head-to-heads for all 16 managers.">
+<meta property="og:description" content="Murder on Zidane's Floor — SKLW FPL team squad room: table, GW lineups with expected points, votes and head-to-heads for all 16 managers.">
 <meta property="og:url" content="https://zidanes-floor.github.io/vote/">
 <meta property="og:image" content="https://zidanes-floor.github.io/vote/assets/og.jpg">
 <meta property="og:image:width" content="1200">
@@ -470,8 +470,8 @@ img { max-width: 100%; }
 <body>
 <div class="sky">
 <div class="wrap">
-  <header class="hero" id="hero" aria-label="Club summary">
-    <div class="crest"><img src="assets/logo.webp" width="640" height="640" alt="Murder on Zidane's Floor club crest" decoding="async" fetchpriority="high"></div>
+  <header class="hero" id="hero" aria-label="Team summary">
+    <div class="crest"><img src="assets/logo.webp" width="640" height="640" alt="Murder on Zidane's Floor team crest" decoding="async" fetchpriority="high"></div>
     <div class="info">
       <div class="eyebrow">SKLW · Squad Room</div>
       <h1 class="wordmark">Murder on <span>Zidane's</span> Floor</h1>
@@ -674,7 +674,7 @@ function renderHero() {
     }
   }
   $('#floor').innerHTML = html;
-  $('#floorcap').textContent = M.length ? `GW${META.gw} points, brightest = top score. Tap a tile for the squad.` : 'Tiles light up once the club’s FPL IDs are synced.';
+  $('#floorcap').textContent = M.length ? `GW${META.gw} points, brightest = top score. Tap a tile for the squad.` : 'Tiles light up once the team’s FPL IDs are synced.';
 
   const status = [];
   status.push(`<span class="pill ${META.gwFinished ? '' : 'live'}">GW${META.gw} · ${META.gwFinished ? 'final' : 'in progress'}</span>`);
@@ -690,7 +690,7 @@ function renderHero() {
   const best = ranked[0], low = ranked[ranked.length - 1];
   const diff = META.gwAvg != null ? avg - META.gwAvg : null;
   $('#clubstats').innerHTML = `
-    <div class="stat"><div class="k">Club average</div><div class="v">${avg}${diff != null ? `<small>${diff >= 0 ? '+' : ''}${diff} vs FPL ${META.gwAvg}</small>` : ''}</div></div>
+    <div class="stat"><div class="k">Team average</div><div class="v">${avg}${diff != null ? `<small>${diff >= 0 ? '+' : ''}${diff} vs FPL ${META.gwAvg}</small>` : ''}</div></div>
     <div class="stat"><div class="k">Top score</div><div class="v">${best.gwNet}</div><div class="who">${esc(best.short)}</div></div>
     <div class="stat"><div class="k">Lowest</div><div class="v">${low.gwNet}</div><div class="who">${esc(low.short)}</div></div>`;
 }
@@ -707,7 +707,7 @@ function renderTabs() {
 }
 function renderBanner() {
   const b = [];
-  if (S.d && S.d.sample) b.push(`<div class="banner"><span><b>Sample squads.</b> These are made-up teams to preview the layout. Your club’s real teams replace them once the 16 FPL IDs sync.</span></div>`);
+  if (S.d && S.d.sample) b.push(`<div class="banner"><span><b>Sample squads.</b> These are made-up teams to preview the layout. The real squads replace them once the 16 FPL IDs sync.</span></div>`);
   if (S.unsaved) b.push(`<div class="banner"><span><b>A change wasn’t saved.</b> The page updated while you were saving. Save it again on top of the latest version?</span><span class="actions"><button class="btn primary" data-action="resave">Save again</button><button class="btn" data-action="dropunsaved">Discard</button></span></div>`);
   const errs = ALL.filter(m => m.err);
   if (errs.length) b.push(`<div class="banner"><span><b>${errs.length} FPL ID${errs.length > 1 ? 's' : ''} didn’t load:</b> ${errs.map(m => esc(m.id)).join(', ')}. Check the number in the FPL points link.</span><button class="btn" data-action="roster">Fix IDs</button></div>`);
@@ -732,7 +732,7 @@ function renderTable() {
   if (!M.length) return emptyClub();
   const rows = [...M].sort(SORTS[S.sort][1]);
   const gmax = Math.max(1, ...M.flatMap(m => m.H.slice(-5).map(h => h.net)));
-  const head = `<div class="viewhead"><div><h2>Club table</h2><p>GW${META.gw} results for all ${M.length} managers. Tap a row for the full squad, transfers and history.</p></div>
+  const head = `<div class="viewhead"><div><h2>Team table</h2><p>GW${META.gw} results for all ${M.length} managers. Tap a row for the full squad, transfers and history.</p></div>
     <div class="controls"><label class="lbl" for="sortsel">Sort by</label><span class="field"><select id="sortsel" data-change="sort">${Object.entries(SORTS).map(([k, v]) => `<option value="${k}" ${k === S.sort ? 'selected' : ''}>${v[0]}</option>`).join('')}</select></span></div></div>`;
   const tr = rows.map((m, i) => {
     const cap = capOf(m), plan = planOf(m);
@@ -763,7 +763,7 @@ function renderTable() {
   return head + table + cards;
 }
 function emptyClub() {
-  return `<div class="empty-state"><p><b>No managers yet.</b></p><p>Add the club’s FPL IDs and every squad is pulled in at the next sync.</p><p><button class="btn primary" data-action="roster">Add FPL IDs</button></p></div>`;
+  return `<div class="empty-state"><p><b>No managers yet.</b></p><p>Add the team’s FPL IDs and every squad is pulled in at the next sync.</p><p><button class="btn primary" data-action="roster">Add FPL IDs</button></p></div>`;
 }
 
 /* ================= Squads view ================= */
@@ -788,7 +788,7 @@ function renderSquads() {
   if (!M.length) return emptyClub();
   return `<div class="viewhead"><div><h2>GW${META.gw} squads</h2><p>Every manager’s GW${META.gw} team with the points each player scored. Bench sits under the dashed line. Upcoming lineups and fixtures are under Lineups.</p></div>
     <div class="controls"><span class="field"><span aria-hidden="true">⌕</span><label class="sr" for="sqsearch">Find a player</label><input id="sqsearch" data-input="sq" placeholder="Find a player, e.g. Haaland" value="${esc(S.q)}" autocomplete="off"></span></div></div>
-    <div class="legend" style="margin-bottom:12px"><span><span class="cv">C</span> captain</span><span><span class="cv v">V</span> vice</span><span><span class="pp diff" style="padding:1px 6px">name</span> only one in the club owns</span><span><span class="dot warn" style="display:inline-block"></span> doubtful <span class="dot bad" style="display:inline-block;margin-left:6px"></span> injured or suspended</span></div>
+    <div class="legend" style="margin-bottom:12px"><span><span class="cv">C</span> captain</span><span><span class="cv v">V</span> vice</span><span><span class="pp diff" style="padding:1px 6px">name</span> only one in the team owns</span><span><span class="dot warn" style="display:inline-block"></span> doubtful <span class="dot bad" style="display:inline-block;margin-left:6px"></span> injured or suspended</span></div>
     <div class="findres" id="findres"></div>
     <div class="sqgrid" id="sqgrid"></div>`;
 }
@@ -809,7 +809,7 @@ function renderSquadGrid() {
       <div class="sq-foot">${foot}</div></article>`;
   }).join('');
   const fr = $('#findres');
-  if (fr) fr.textContent = q ? (matches ? `${matches} of ${M.length} have ${hitName}` : 'Nobody in the club has a player matching that name.') : '';
+  if (fr) fr.textContent = q ? (matches ? `${matches} of ${M.length} have ${hitName}` : 'Nobody in the team has a player matching that name.') : '';
 }
 
 /* ================= Lineups view (next GW) ================= */
@@ -996,7 +996,7 @@ function renderLineupGrid() {
   let best = null, bv = -1e9; proj.forEach((v, id) => { const net = v - hitOf(planOf(findM(id))); if (net > bv) { bv = net; best = id; } });
   g.innerHTML = shown.map((m, i) => lineupCard(m, q, { three, slot: i, proj, sq, best: shown.length > 1 ? best : null })).join('');
   const f = $('#lufind');
-  if (f) { if (!q) f.textContent = ''; else { const n = M.filter(m => { const s = lineupSquad(m); return s && s.ids.some(id => fold((P.get(id) || {}).name).includes(q)); }).length; f.textContent = n ? `${n} of ${M.length} squads include a player matching “${S.lq.trim()}”${three ? ' (whole club)' : ''}` : 'No squad has a player matching that name.'; } }
+  if (f) { if (!q) f.textContent = ''; else { const n = M.filter(m => { const s = lineupSquad(m); return s && s.ids.some(id => fold((P.get(id) || {}).name).includes(q)); }).length; f.textContent = n ? `${n} of ${M.length} squads include a player matching “${S.lq.trim()}”${three ? ' (whole team)' : ''}` : 'No squad has a player matching that name.'; } }
 }
 
 /* ================= Screenshot reading ================= */
@@ -1308,7 +1308,7 @@ function renderCompare() {
         <div class="srow"><span class="va">${caps[0]}</span><div></div><span class="lab">Captain</span><div></div><span class="vb">${caps[1]}</span></div>
       </section>
       <section class="panel chart"><h3>Points by gameweek</h3>
-        <div class="lgd"><span><span class="sw a"></span>${esc(A.short)}</span><span><span class="sw b"></span>${esc(B.short)}</span><span><span class="refk"></span>Club average</span></div>
+        <div class="lgd"><span><span class="sw a"></span>${esc(A.short)}</span><span><span class="sw b"></span>${esc(B.short)}</span><span><span class="refk"></span>Team average</span></div>
         ${gwChart(A, B)}
       </section>
     </div>
@@ -1343,7 +1343,7 @@ function gwChart(A, B) {
     const e = avg.get(w); if (e) pts.push([cx, y(e[0] / e[1]), Math.round(e[0] / e[1]), w]);
   });
   const ref = pts.length > 1 ? `<polyline class="ref" points="${pts.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ')}"/>` : '';
-  const hov = pts.map(p => `<rect class="hov" x="${(p[0] - gw / 2).toFixed(1)}" y="${Tp}" width="${gw}" height="${ph}"><title>GW${p[3]} — ${esc(A.short)} ${va.get(p[3]) ?? '–'}, ${esc(B.short)} ${vb.get(p[3]) ?? '–'}, club avg ${p[2]}</title></rect>`).join('');
+  const hov = pts.map(p => `<rect class="hov" x="${(p[0] - gw / 2).toFixed(1)}" y="${Tp}" width="${gw}" height="${ph}"><title>GW${p[3]} — ${esc(A.short)} ${va.get(p[3]) ?? '–'}, ${esc(B.short)} ${vb.get(p[3]) ?? '–'}, team avg ${p[2]}</title></rect>`).join('');
   return `<div style="overflow-x:auto"><svg viewBox="0 0 ${W} ${H}" style="min-width:${Math.min(W, 520)}px" role="img" aria-label="Points by gameweek for ${esc(A.short)} and ${esc(B.short)}">${g}${bars}${ref}${hov}</svg></div>`;
 }
 function overlap(A, B, sA, sB) {
@@ -1384,11 +1384,11 @@ function renderOwnership() {
       <td>${S.mode === 'plan' ? fxNext(o.p, META.next) : `<span class="num">${o.p.gw}</span>`}</td>
     </tr>${open ? `<tr class="owners"><td colspan="7"><div class="chips">${o.owners.map(id => { const m = findM(id); const s = squadOf(m); const tag = s && s.c === o.id ? ' (C)' : s && s.ids.indexOf(o.id) >= 11 ? ' (bench)' : ''; return `<button class="chipbtn" data-action="open" data-id="${id}">${esc(m.short)}${tag}</button>`; }).join('')}</div></td></tr>` : ''}`;
   }).join('');
-  return `<div class="viewhead"><div><h2>Club ownership</h2><p>Who the club owns across ${esc(modeLabel(S.mode))}. “Club vs FPL” is the club’s ownership minus the global FPL figure, in percentage points: high numbers are the club’s template, negatives are where we’re light. Tap a row to see the owners.</p></div>
+  return `<div class="viewhead"><div><h2>Team ownership</h2><p>Who the team owns across ${esc(modeLabel(S.mode))}. “Team vs FPL” is the team’s ownership minus the global FPL figure, in percentage points: high numbers are the team’s template, negatives are where we’re light. Tap a row to see the owners.</p></div>
     <div class="controls"><div class="chips">${posBtns}</div><span class="field"><label class="sr" for="ownsort">Sort</label><select id="ownsort" data-change="ownSort">
       <option value="own" ${S.ownSort === 'own' ? 'selected' : ''}>Most owned</option><option value="cap" ${S.ownSort === 'cap' ? 'selected' : ''}>Most captained</option>
-      <option value="edge" ${S.ownSort === 'edge' ? 'selected' : ''}>Club over FPL</option><option value="under" ${S.ownSort === 'under' ? 'selected' : ''}>Club under FPL</option></select></span></div></div>
-    <div class="tablebox"><table class="own"><thead><tr><th>Player</th><th>In squads</th><th class="r">Starting</th><th class="r">Captain</th><th class="r">FPL owned</th><th class="r">Club vs FPL</th><th>${S.mode === 'plan' ? 'GW' + META.next : 'GW' + META.gw + ' pts'}</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <option value="edge" ${S.ownSort === 'edge' ? 'selected' : ''}>Team over FPL</option><option value="under" ${S.ownSort === 'under' ? 'selected' : ''}>Team under FPL</option></select></span></div></div>
+    <div class="tablebox"><table class="own"><thead><tr><th>Player</th><th>In squads</th><th class="r">Starting</th><th class="r">Captain</th><th class="r">FPL owned</th><th class="r">Team vs FPL</th><th>${S.mode === 'plan' ? 'GW' + META.next : 'GW' + META.gw + ' pts'}</th></tr></thead><tbody>${rows}</tbody></table></div>
     ${total > 30 ? `<p style="text-align:center"><button class="btn" data-action="ownall">${S.ownAll ? 'Show top 30' : `Show all ${total} players`}</button></p>` : ''}`;
 }
 
@@ -1432,7 +1432,7 @@ function histChart(m) {
     const e = avg.get(h.gw); if (e) pts.push(`${cx.toFixed(1)},${y(e[0] / e[1]).toFixed(1)}`);
   });
   if (pts.length > 1) s += `<polyline class="ref" points="${pts.join(' ')}"/>`;
-  return `<div class="chart histchart"><div class="lgd"><span><span class="sw" style="background:var(--accent-strong)"></span>Points per GW</span><span><span class="refk"></span>Club average</span></div><svg viewBox="0 0 ${W} ${Hh}" role="img" aria-label="Points per gameweek">${s}</svg></div>`;
+  return `<div class="chart histchart"><div class="lgd"><span><span class="sw" style="background:var(--accent-strong)"></span>Points per GW</span><span><span class="refk"></span>Team average</span></div><svg viewBox="0 0 ${W} ${Hh}" role="img" aria-label="Points per gameweek">${s}</svg></div>`;
 }
 function pitchHTML(s, opts = {}) {
   const starters = s.ids.slice(0, 11), bench = s.ids.slice(11);
@@ -1476,7 +1476,7 @@ function mgrHTML() {
     squad = s ? pitchHTML(s) : `<div class="empty-state" style="padding:24px">No GW${META.gw} team on FPL for this manager.</div>`;
   }
   const canPlan = META.next && m.actual;
-  return `<div class="sh-top"><div style="min-width:0"><div class="eyebrow">${m.role ? esc(m.role) + ' · ' : ''}Club #${clubPos} on season points</div><h2 class="sh-title" id="sh-title">${esc(m.team)}</h2>
+  return `<div class="sh-top"><div style="min-width:0"><div class="eyebrow">${m.role ? esc(m.role) + ' · ' : ''}#${clubPos} in the team on season points</div><h2 class="sh-title" id="sh-title">${esc(m.team)}</h2>
       <div class="sh-sub"><span>${esc(m.who)}</span><a href="${fplUrl}" target="_blank" rel="noopener">Open on FPL ↗</a><span class="muted num">ID ${m.id}</span></div></div>
       <button class="xbtn" data-action="close" aria-label="Close">×</button></div>
     <div class="kv">
@@ -1612,7 +1612,7 @@ function pickerList(p) {
     const o = own.get(x.id); const cnt = {}; e.ids.forEach(id => { const y = P.get(id); if (y && id !== e.ids[S.sheet.slot]) cnt[y.team] = (cnt[y.team] || 0) + 1; });
     const over = (cnt[x.team] || 0) >= 3;
     return `<button class="prow" data-action="pick" data-pid="${x.id}"><span class="n">${flagDot(x)}${esc(x.name)} <span class="muted" style="font-weight:500">${tshort(x.team)}</span></span><span class="r">${fmtM(x.cost)}</span>
-      <span class="sub"><span><b>xP ${xpOf(x.id).toFixed(1)}</b></span><span>${x.total} pts</span><span>Form ${x.form.toFixed(1)}</span><span>${x.sel.toFixed(1)}% FPL</span>${o ? `<span class="tag gold">${o.n} in club</span>` : ''}${over ? '<span class="tag" style="color:var(--warn)">4th from club</span>' : ''}<span>${fxRun(x, 3)}</span>${x.flag ? `<span>${esc(x.flag.news || x.flag.label)}</span>` : ''}</span></button>`;
+      <span class="sub"><span><b>xP ${xpOf(x.id).toFixed(1)}</b></span><span>${x.total} pts</span><span>Form ${x.form.toFixed(1)}</span><span>${x.sel.toFixed(1)}% FPL</span>${o ? `<span class="tag gold">${o.n} in team</span>` : ''}${over ? '<span class="tag" style="color:var(--warn)">4th from club</span>' : ''}<span>${fxRun(x, 3)}</span>${x.flag ? `<span>${esc(x.flag.news || x.flag.label)}</span>` : ''}</span></button>`;
   }).join('') + (n > 40 ? `<p class="muted" style="margin:6px 4px;font-size:12.5px">Showing 40 of ${n}. Type a name to narrow it down.</p>` : '');
 }
 function orderPlan(e) {
@@ -1630,12 +1630,12 @@ function rosterHTML() {
       ${S.canWrite ? `<button class="btn" data-action="togglehide" data-id="${m.id}">${hid.has(m.id) ? 'Show' : 'Hide'}</button>` : '<span></span>'}</div>`).join('');
   const pend = r.draft.pending.filter(id => !ALL.some(m => m.id === +id)).map(id => `<div class="idrow"><div class="who"><b>Waiting for sync</b><span><code>ID ${esc(id)}</code></span></div><span></span>${S.canWrite ? `<button class="btn" data-action="droppending" data-id="${esc(id)}">Remove</button>` : '<span></span>'}</div>`).join('');
   const dirty = JSON.stringify(r.draft) !== JSON.stringify({ pending: (S.edits.pending || []).map(String), hidden: (S.edits.hidden || []).map(Number) });
-  return `<div class="sh-top"><div><div class="eyebrow">Club members</div><h2 class="sh-title" id="sh-title">FPL IDs</h2>
+  return `<div class="sh-top"><div><div class="eyebrow">Team members</div><h2 class="sh-title" id="sh-title">FPL IDs</h2>
       <div class="sh-sub"><span>${OPEN ? 'Each squad is pulled from FPL using these IDs. New IDs show up at the next automatic update (within the hour).' : 'Claude pulls each squad from FPL using these IDs. New IDs show up after the next sync.'}</span></div></div>
       <button class="xbtn" data-action="close" aria-label="Close">×</button></div>
     ${S.canWrite ? `<form class="formrow" data-form="addid" style="grid-template-columns:minmax(0,1fr) auto;align-items:end">
       <div><label class="lbl" for="newid">Add an FPL ID</label><span class="field"><input id="newid" inputmode="numeric" pattern="[0-9]*" maxlength="9" placeholder="Number from fantasy.premierleague.com/entry/…" autocomplete="off"></span></div>
-      <button class="btn" type="submit">Add</button></form>` : `<div class="msg">${OPEN ? 'Changing the member list switches on once the club backend is connected.' : 'This view is read-only. Ask the page owner to change the member list.'}</div>`}
+      <button class="btn" type="submit">Add</button></form>` : `<div class="msg">${OPEN ? 'Changing the member list switches on once the team backend is connected.' : 'This view is read-only. Ask the page owner to change the member list.'}</div>`}
     <div class="idlist">${pend}${synced || (pend ? '' : '<div class="empty-state" style="padding:20px">No IDs yet.</div>')}</div>
     ${S.canWrite ? `<div class="actions"><button class="btn primary" data-action="saveroster" ${dirty ? '' : 'disabled'}>Save member list</button></div>` : ''}`;
 }
@@ -1832,7 +1832,7 @@ document.addEventListener('input', ev => {
 document.addEventListener('change', ev => {
   const k = ev.target.dataset.change; if (!k) return;
   const v = ev.target.value;
-  if (k === 'sort') { S.sort = v; store.set('sort', v); renderView(); }
+  if (k === 'sort') { S.sort = v; store.set('sort2', v); renderView(); }
   if (k === 'cmpA' || k === 'cmpB') { S[k] = +v; if (S.cmpA === S.cmpB) { const other = M.find(m => m.id !== S[k]); S[k === 'cmpA' ? 'cmpB' : 'cmpA'] = other.id; } store.set('cmp', [S.cmpA, S.cmpB]); renderView(); }
   if (k === 'ownSort') { S.ownSort = v; renderView(); }
   if (k === 'lu3') {
@@ -1878,7 +1878,7 @@ document.addEventListener('submit', ev => {
 /* ================= Boot ================= */
 async function boot() {
   S.tab = ['table', 'lineups', 'vote', 'squads', 'compare', 'ownership'].includes((location.hash || '').slice(1)) ? location.hash.slice(1) : store.get('tab', 'table');
-  S.sort = store.get('sort', 'gw'); if (!SORTS[S.sort]) S.sort = 'gw';
+  S.sort = store.get('sort2', 'or'); if (!SORTS[S.sort]) S.sort = 'or';
   S.mode = store.get('mode', 'actual');
   const cmp = store.get('cmp', []); S.cmpA = cmp[0] || null; S.cmpB = cmp[1] || null; S.luFx = store.get('lufx', 1) === 3 ? 3 : 1; S.luMode = store.get('lumode', 'three') === 'all' ? 'all' : 'three'; S.lu3 = store.get('lu3', []); S.xpSrc = store.get('xpsrc', 'Solio'); S.luOpt = store.get('luopt', true) !== false;
   render();

@@ -1,6 +1,6 @@
 # Murder on Zidane's Floor — Squad Room
 
-The SKLW FPL club page for all 16 managers: table, next-GW lineups with expected points, the lineup vote,
+The SKLW FPL team page for all 16 managers: table, next-GW lineups with expected points, the lineup vote,
 squads, head-to-heads and ownership.
 
 **Site:** https://zidanes-floor.github.io/vote/
