@@ -339,6 +339,11 @@ table.club tbody tr:hover { background: var(--surface-2); }
 .ovl li { display: flex; justify-content: space-between; gap: 8px; font-size: 13.5px; padding: 4px 8px; border-radius: 6px; background: var(--surface-2); min-width: 0; }
 .ovl li .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ovl li .pos { color: var(--muted); font-size: 11px; font-weight: 700; margin-right: 6px; }
+/* Benched players: no fill, dashed outline, faded text, and listed after the starters */
+.ovl li.bench { background: transparent; box-shadow: inset 0 0 0 1px var(--line); opacity: .55; }
+.ovl li.bench .n { font-style: italic; }
+.ovl li.part .bt { color: var(--warn); }
+.ovl li.sep { background: none; padding: 6px 2px 0; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .share { font-family: var(--f-display); font-weight: 900; font-size: 44px; line-height: 1; }
 
 /* ---------- Ownership ---------- */
@@ -1359,14 +1364,28 @@ function overlap(A, B, sA, sB) {
   const shared = sA.ids.filter(id => setB.has(id)), onlyA = sA.ids.filter(id => !setB.has(id)), onlyB = sB.ids.filter(id => !setA.has(id));
   const startersShared = shared.filter(id => sA.ids.indexOf(id) < 11 && sB.ids.indexOf(id) < 11).length;
   const isPlan = S.mode === 'plan';
-  const li = (id, s) => { const p = P.get(id); if (!p) return ''; const benched = s.ids.indexOf(id) >= 11; return `<li title="${esc(POS_LONG[p.pos])}, ${esc((T.get(p.team) || {}).name || '')}${benched ? ' · on the bench' : ''}"><span class="n"><span class="pos">${POS[p.pos]}</span>${esc(p.name)}${id === s.c ? ' (C)' : ''}${benched ? ' <span class="muted">· bench</span>' : ''}</span><span class="num">${isPlan ? `${fxNext(p, META.next)} ${xpOf(id).toFixed(1)}` : ptsOf(s, id)}</span></li>`; };
+  const bA = id => sA.ids.indexOf(id) >= 11, bB = id => sB.ids.indexOf(id) >= 11;
+  // benchOf: is this player benched in the list's squad(s)? For "Both", only dim when both bench him; flag it when one does.
+  const li = (id, s, both) => {
+    const p = P.get(id); if (!p) return '';
+    const benched = both ? bA(id) && bB(id) : s.ids.indexOf(id) >= 11;
+    const partly = both && !benched && (bA(id) || bB(id)) ? (bA(id) ? A.short : B.short) : '';
+    const cap = both ? [sA.c === id ? A.short : '', sB.c === id ? B.short : ''].filter(Boolean) : (id === s.c ? ['C'] : []);
+    const capTxt = !cap.length ? '' : both ? ` (C ${cap.length === 2 ? 'both' : esc(cap[0])})` : ' (C)';
+    return `<li class="${benched ? 'bench' : ''}${partly ? ' part' : ''}" title="${esc(POS_LONG[p.pos])}, ${esc((T.get(p.team) || {}).name || '')}${benched ? ' · on the bench' : partly ? ' · on ' + esc(partly) + '’s bench' : ''}"><span class="n"><span class="pos">${POS[p.pos]}</span>${esc(p.name)}${capTxt}${benched ? ' <span class="muted">· bench</span>' : partly ? ` <span class="bt">· ${esc(partly)} bench</span>` : ''}</span><span class="num">${isPlan ? `${fxNext(p, META.next)} ${xpOf(id).toFixed(1)}` : ptsOf(s, id)}</span></li>`;
+  };
   const sortPos = (ids) => [...ids].sort((x, y) => (P.get(x) || {}).pos - (P.get(y) || {}).pos);
+  const list = (ids, s, both) => {
+    const isB = id => both ? bA(id) && bB(id) : s.ids.indexOf(id) >= 11;
+    const on = sortPos(ids.filter(id => !isB(id))), off = sortPos(ids.filter(isB));
+    return [...on.map(id => li(id, s, both)), off.length && on.length ? '<li class="sep" aria-hidden="true">Bench</li>' : '', ...off.map(id => li(id, s, both))].join('') || '<li>Nobody</li>';
+  };
   return `<h3>Squad overlap</h3>
     <div style="display:flex;gap:18px;align-items:end;flex-wrap:wrap;margin-bottom:14px"><span class="share num">${shared.length}<span class="muted" style="font-size:20px">/15</span></span><span class="muted" style="font-size:13.5px;max-width:48ch">players in both squads, ${startersShared} of them starting for both. The players below are where these two can gain or lose ground on each other.</span></div>
     <div class="ovl">
-      <div><h4><span class="sw a"></span>Only ${esc(A.short)}</h4><ul>${sortPos(onlyA).map(id => li(id, sA)).join('') || '<li>Nobody</li>'}</ul></div>
-      <div><h4>Both</h4><ul>${sortPos(shared).map(id => li(id, sA)).join('') || '<li>Nobody</li>'}</ul></div>
-      <div><h4><span class="sw b"></span>Only ${esc(B.short)}</h4><ul>${sortPos(onlyB).map(id => li(id, sB)).join('') || '<li>Nobody</li>'}</ul></div>
+      <div><h4><span class="sw a"></span>Only ${esc(A.short)}</h4><ul>${list(onlyA, sA)}</ul></div>
+      <div><h4>Both</h4><ul>${list(shared, sA, true)}</ul></div>
+      <div><h4><span class="sw b"></span>Only ${esc(B.short)}</h4><ul>${list(onlyB, sB)}</ul></div>
     </div>`;
 }
 
