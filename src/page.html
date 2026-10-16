@@ -343,6 +343,9 @@ table.club tbody tr:hover { background: var(--surface-2); }
 .ovl li.bench { background: transparent; box-shadow: inset 0 0 0 1px var(--line); opacity: .55; }
 .ovl li.bench .n { font-style: italic; }
 .ovl li.part .bt { color: var(--warn); }
+.ovl .tot { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-top: 8px; padding: 8px 8px 0; border-top: 1px solid var(--line); font-size: 13px; color: var(--ink-2); }
+.ovl .tot b { font-family: var(--f-display); font-weight: 800; font-size: 22px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.ovl .tot small { display: block; font-size: 11.5px; color: var(--muted); }
 .ovl li.sep { background: none; padding: 6px 2px 0; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .share { font-family: var(--f-display); font-weight: 900; font-size: 44px; line-height: 1; }
 
@@ -1380,12 +1383,35 @@ function overlap(A, B, sA, sB) {
     const on = sortPos(ids.filter(id => !isB(id))), off = sortPos(ids.filter(isB));
     return [...on.map(id => li(id, s, both)), off.length && on.length ? '<li class="sep" aria-hidden="true">Bench</li>' : '', ...off.map(id => li(id, s, both))].join('') || '<li>Nobody</li>';
   };
+  // What these players are worth to a squad: expected points (GW-next view) or points scored (GW view),
+  // counting starters with the captain's multiplier; bench shown separately (it only scores with Bench Boost).
+  const worth = (ids, s) => {
+    let xi = 0, bench = 0;
+    ids.forEach(id => {
+      const i = s.ids.indexOf(id); if (i < 0) return;
+      if (isPlan) { const x = xpOf(id), mult = i < 11 ? (id === s.c ? (s.chip === '3xc' ? 3 : 2) : 1) : 0; if (i < 11) xi += x * mult; else bench += x; }
+      else { if (i < 11 || (s.mult[id] || 0) > 0) xi += ptsOf(s, id); else bench += P.get(id) ? P.get(id).gw : 0; }
+    });
+    return { xi, bench };
+  };
+  const fmtW = v => isPlan ? v.toFixed(1) : String(Math.round(v));
+  const unit = isPlan ? `GW${META.next} xP` : `GW${META.gw} points`;
+  const totBox = (ids, s, who) => {
+    if (!ids.length) return '';
+    const w = worth(ids, s);
+    return `<div class="tot"><span>${who ? esc(who) + ' · ' : ''}${unit}<small>starters${isPlan ? ', captain doubled' : ''}${w.bench ? ` · bench ${fmtW(w.bench)}` : ''}</small></span><b>${fmtW(w.xi)}</b></div>`;
+  };
+  const totBoth = () => {
+    if (!shared.length) return '';
+    const wa = worth(shared, sA), wb = worth(shared, sB);
+    return fmtW(wa.xi) === fmtW(wb.xi) && fmtW(wa.bench) === fmtW(wb.bench) ? totBox(shared, sA) : totBox(shared, sA, A.short) + totBox(shared, sB, B.short);
+  };
   return `<h3>Squad overlap</h3>
     <div style="display:flex;gap:18px;align-items:end;flex-wrap:wrap;margin-bottom:14px"><span class="share num">${shared.length}<span class="muted" style="font-size:20px">/15</span></span><span class="muted" style="font-size:13.5px;max-width:48ch">players in both squads, ${startersShared} of them starting for both. The players below are where these two can gain or lose ground on each other.</span></div>
     <div class="ovl">
-      <div><h4><span class="sw a"></span>Only ${esc(A.short)}</h4><ul>${list(onlyA, sA)}</ul></div>
-      <div><h4>Both</h4><ul>${list(shared, sA, true)}</ul></div>
-      <div><h4><span class="sw b"></span>Only ${esc(B.short)}</h4><ul>${list(onlyB, sB)}</ul></div>
+      <div><h4><span class="sw a"></span>Only ${esc(A.short)}</h4><ul>${list(onlyA, sA)}</ul>${totBox(onlyA, sA)}</div>
+      <div><h4>Both</h4><ul>${list(shared, sA, true)}</ul>${totBoth()}</div>
+      <div><h4><span class="sw b"></span>Only ${esc(B.short)}</h4><ul>${list(onlyB, sB)}</ul>${totBox(onlyB, sB)}</div>
     </div>`;
 }
 
