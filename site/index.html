@@ -341,6 +341,9 @@ table.club tbody tr:hover { background: var(--surface-2); }
 .chart .ax text { fill: var(--muted); font-size: 11px; font-family: var(--f-body); }
 .chart rect.a { fill: var(--series-a); } .chart rect.b { fill: var(--series-b); }
 .chart rect.hov { fill: transparent; }
+.chart rect.proj { fill-opacity: .4; stroke-width: 1.5; stroke-dasharray: 3 2; }
+.chart rect.a.proj { stroke: var(--series-a); } .chart rect.b.proj { stroke: var(--series-b); }
+.sw.proj { background: transparent; border: 1.5px dashed var(--muted); }
 .chart .ref { stroke: var(--ink-2); stroke-dasharray: 3 3; stroke-width: 1.5; fill: none; }
 .chart rect.one { fill: var(--accent-strong); }
 .lgd { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--ink-2); margin-bottom: 8px; align-items: center; }
@@ -634,7 +637,7 @@ function planSquad(p) {
   ids.forEach((id, i) => { mult[id] = i < 11 ? (id === p.c ? (p.chip === '3xc' ? 3 : 2) : 1) : (p.chip === 'bboost' ? 1 : 0); });
   return { src: 'plan', gw: p.gw, ids, mult, c: p.c, vc: p.vc, chip: p.chip || null, note: p.note || '', at: p.at, subIn: new Set(), subOut: new Set() };
 }
-function squadOf(m, mode) { if ((mode || S.mode) === 'plan') { const p = planOf(m); if (p) return planSquad(p); } return m.actual; }
+function squadOf(m, mode) { if ((mode || S.mode) === 'plan' && META.next && m.actual) return lineupView(m); return m.actual; }
 function ownership(mode) {
   const own = new Map();
   for (const m of M) {
@@ -1280,8 +1283,24 @@ function renderCompare() {
   if (!findM(S.cmpB) || S.cmpB === S.cmpA) S.cmpB = ranked.find(m => m.id !== S.cmpA).id;
   const A = findM(S.cmpA), B = findM(S.cmpB);
   const opts = sel => ranked.map(m => `<option value="${m.id}" ${m.id === sel ? 'selected' : ''}>${esc(m.team)} · ${esc(m.short)}</option>`).join('');
-  const sA = squadOf(A), sB = squadOf(B);
-  const rowsDef = [
+  const sA = squadOf(A), sB = squadOf(B), isPlan = S.mode === 'plan' && META.next;
+  const xi = s => s ? s.ids.slice(0, 11) : [];
+  const capX = s => s && s.c ? xpOf(s.c) * (s.chip === '3xc' ? 3 : 2) : 0;
+  const benchX = s => s ? s.ids.slice(11).reduce((t, id) => t + xpOf(id), 0) : 0;
+  const diffX = (s, o) => { const other = new Set(xi(o)); return xi(s).filter(id => !other.has(id)).reduce((t, id) => t + xpOf(id) * (id === s.c ? (s.chip === '3xc' ? 3 : 2) : 1), 0); };
+  const ftNum = m => { const f = ftInfo(m); return f.v === 'Unlimited' ? 99 : +f.v; };
+  const planRows = isPlan ? [
+    [`GW${META.next} xP`, projNet(A), projNet(B), v => v.toFixed(1), 'high'],
+    ['Captain xP', capX(sA), capX(sB), v => v.toFixed(1), 'high'],
+    ['Differential xP', diffX(sA, sB), diffX(sB, sA), v => v.toFixed(1), 'high'],
+    ['Bench xP', benchX(sA), benchX(sB), v => v.toFixed(1), null],
+    ['Hit taken', hitOf(planOf(A)), hitOf(planOf(B)), v => v ? '−' + v : '0', 'low'],
+    ['Free transfers', ftNum(A), ftNum(B), v => v === 99 ? 'Unlimited' : String(v), null],
+    ['In the bank', A.bank, B.bank, fmtM, null],
+    ['Season', A.total, B.total, fmtInt, 'high'],
+    ['Overall rank', A.or, B.or, fmtRank, 'low']
+  ] : null;
+  const rowsDef = planRows || [
     [`GW${META.gw}`, A.gwNet, B.gwNet, v => v == null ? '—' : v, 'high'],
     ['Season', A.total, B.total, fmtInt, 'high'],
     ['Overall rank', A.or, B.or, fmtRank, 'low'],
@@ -1302,7 +1321,8 @@ function renderCompare() {
     return `<div class="srow"><span class="va ${wa ? 'win' : ''}">${f(a)}</span><div><div class="bar a" style="width:${wA.toFixed(1)}%"></div></div><span class="lab">${lab}</span><div><div class="bar b" style="width:${wB.toFixed(1)}%"></div></div><span class="vb ${wb ? 'win' : ''}">${f(b)}</span></div>`;
   }).join('');
   const caps = [A, B].map(m => { const s = squadOf(m); const p = s && P.get(s.c); return p ? esc(p.name) : '—'; });
-  return `<div class="viewhead"><div><h2>Head to head</h2><p>Pick any two managers. Squads use ${esc(modeLabel(S.mode))}${S.mode === 'plan' ? ' (or the current team where none is entered)' : ''}.</p></div></div>
+  const entered = M.filter(planOf).length;
+  return `<div class="viewhead"><div><h2>Head to head</h2><p>Pick any two managers. ${isPlan ? `Comparing GW${META.next} lineups: the one each manager entered or uploaded, otherwise the best XI from their GW${META.gw} squad (${entered} of ${M.length} entered so far). Differential xP counts only starters the other doesn’t have.` : `Comparing GW${META.gw} teams.`}</p></div></div>
     <div class="cmp-pick">
       <span class="field"><span class="sw a" aria-hidden="true"></span><label class="sr" for="cmpa">Manager A</label><select id="cmpa" data-change="cmpA">${opts(A.id)}</select></span>
       <span class="vs">VS</span>
@@ -1312,9 +1332,9 @@ function renderCompare() {
       <section class="panel"><h3>Numbers</h3>${statRows}
         <div class="srow"><span class="va">${caps[0]}</span><div></div><span class="lab">Captain</span><div></div><span class="vb">${caps[1]}</span></div>
       </section>
-      <section class="panel chart"><h3>Points by gameweek</h3>
-        <div class="lgd"><span><span class="sw a"></span>${esc(A.short)}</span><span><span class="sw b"></span>${esc(B.short)}</span><span><span class="refk"></span>Team average</span></div>
-        ${gwChart(A, B)}
+      <section class="panel chart"><h3>Points by gameweek${isPlan ? ` · GW${META.next} projected` : ''}</h3>
+        <div class="lgd"><span><span class="sw a"></span>${esc(A.short)}</span><span><span class="sw b"></span>${esc(B.short)}</span><span><span class="refk"></span>Team average</span>${isPlan ? `<span><span class="sw proj" aria-hidden="true"></span>GW${META.next} expected</span>` : ''}</div>
+        ${gwChart(A, B, isPlan)}
       </section>
     </div>
     <section class="panel" style="margin-top:14px">${overlap(A, B, sA, sB)}</section>`;
@@ -1324,11 +1344,18 @@ function clubAvgByGW() {
   M.forEach(m => m.H.forEach(h => { const e = map.get(h.gw) || [0, 0]; e[0] += h.net; e[1]++; map.set(h.gw, e); }));
   return map;
 }
-function gwChart(A, B) {
+function gwChart(A, B, proj) {
   const gws = [...new Set([...A.H, ...B.H].map(h => h.gw))].sort((a, b) => a - b);
-  if (!gws.length) return '<p class="muted">No gameweeks played yet.</p>';
+  if (!gws.length && !proj) return '<p class="muted">No gameweeks played yet.</p>';
   const avg = clubAvgByGW();
   const va = new Map(A.H.map(h => [h.gw, h.net])), vb = new Map(B.H.map(h => [h.gw, h.net]));
+  const nxt = proj && META.next && !gws.includes(META.next) ? META.next : null;
+  if (nxt) {
+    gws.push(nxt);
+    va.set(nxt, Math.round(projNet(A) * 10) / 10); vb.set(nxt, Math.round(projNet(B) * 10) / 10);
+    const all = M.filter(m => m.actual).map(projNet);
+    if (all.length) avg.set(nxt, [all.reduce((t, v) => t + v, 0), all.length]);
+  }
   const max = Math.max(10, ...gws.map(g => Math.max(va.get(g) || 0, vb.get(g) || 0, (avg.get(g) || [0, 1])[0] / (avg.get(g) || [0, 1])[1])));
   const step = niceStep(max), top = Math.ceil(max / step) * step;
   const L = 34, R = 8, Tp = 10, Bt = 24, bw = 16, gap = 2, gw = Math.max(44, (560 - 42) / gws.length);
@@ -1338,13 +1365,14 @@ function gwChart(A, B) {
   for (let t = 0; t <= top + 1e-9; t += step) g += `<line x1="${L}" x2="${W - R}" y1="${y(t).toFixed(1)}" y2="${y(t).toFixed(1)}"/>`;
   g += '</g><g class="ax">';
   for (let t = 0; t <= top + 1e-9; t += step) g += `<text x="${L - 6}" y="${(y(t) + 4).toFixed(1)}" text-anchor="end">${Math.round(t)}</text>`;
-  gws.forEach((w, i) => { g += `<text x="${(L + i * gw + gw / 2).toFixed(1)}" y="${H - 6}" text-anchor="middle">GW${w}</text>`; });
+  gws.forEach((w, i) => { g += `<text x="${(L + i * gw + gw / 2).toFixed(1)}" y="${H - 6}" text-anchor="middle">GW${w}${w === nxt ? ' xP' : ''}</text>`; });
   g += '</g>';
   let bars = '', pts = [];
   gws.forEach((w, i) => {
     const cx = L + i * gw + gw / 2, a = va.get(w), b = vb.get(w);
-    if (a != null) bars += `<rect class="a" x="${(cx - bw - gap / 2).toFixed(1)}" y="${y(a).toFixed(1)}" width="${bw}" height="${(Tp + ph - y(a)).toFixed(1)}" rx="3"><title>${esc(A.short)} GW${w}: ${a}</title></rect>`;
-    if (b != null) bars += `<rect class="b" x="${(cx + gap / 2).toFixed(1)}" y="${y(b).toFixed(1)}" width="${bw}" height="${(Tp + ph - y(b)).toFixed(1)}" rx="3"><title>${esc(B.short)} GW${w}: ${b}</title></rect>`;
+    const pc = w === nxt ? ' proj' : '';
+    if (a != null) bars += `<rect class="a${pc}" x="${(cx - bw - gap / 2).toFixed(1)}" y="${y(a).toFixed(1)}" width="${bw}" height="${(Tp + ph - y(a)).toFixed(1)}" rx="3"><title>${esc(A.short)} GW${w}${w === nxt ? ' expected' : ''}: ${a}</title></rect>`;
+    if (b != null) bars += `<rect class="b${pc}" x="${(cx + gap / 2).toFixed(1)}" y="${y(b).toFixed(1)}" width="${bw}" height="${(Tp + ph - y(b)).toFixed(1)}" rx="3"><title>${esc(B.short)} GW${w}${w === nxt ? ' expected' : ''}: ${b}</title></rect>`;
     const e = avg.get(w); if (e) pts.push([cx, y(e[0] / e[1]), Math.round(e[0] / e[1]), w]);
   });
   const ref = pts.length > 1 ? `<polyline class="ref" points="${pts.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ')}"/>` : '';
@@ -1357,7 +1385,7 @@ function overlap(A, B, sA, sB) {
   const shared = sA.ids.filter(id => setB.has(id)), onlyA = sA.ids.filter(id => !setB.has(id)), onlyB = sB.ids.filter(id => !setA.has(id));
   const startersShared = shared.filter(id => sA.ids.indexOf(id) < 11 && sB.ids.indexOf(id) < 11).length;
   const isPlan = S.mode === 'plan';
-  const li = (id, s) => { const p = P.get(id); if (!p) return ''; const benched = s.ids.indexOf(id) >= 11; return `<li title="${esc(POS_LONG[p.pos])}, ${esc((T.get(p.team) || {}).name || '')}${benched ? ' · on the bench' : ''}"><span class="n"><span class="pos">${POS[p.pos]}</span>${esc(p.name)}${id === s.c ? ' (C)' : ''}${benched ? ' <span class="muted">· bench</span>' : ''}</span><span class="num">${isPlan ? fxNext(p, META.next) : ptsOf(s, id)}</span></li>`; };
+  const li = (id, s) => { const p = P.get(id); if (!p) return ''; const benched = s.ids.indexOf(id) >= 11; return `<li title="${esc(POS_LONG[p.pos])}, ${esc((T.get(p.team) || {}).name || '')}${benched ? ' · on the bench' : ''}"><span class="n"><span class="pos">${POS[p.pos]}</span>${esc(p.name)}${id === s.c ? ' (C)' : ''}${benched ? ' <span class="muted">· bench</span>' : ''}</span><span class="num">${isPlan ? `${fxNext(p, META.next)} ${xpOf(id).toFixed(1)}` : ptsOf(s, id)}</span></li>`; };
   const sortPos = (ids) => [...ids].sort((x, y) => (P.get(x) || {}).pos - (P.get(y) || {}).pos);
   return `<h3>Squad overlap</h3>
     <div style="display:flex;gap:18px;align-items:end;flex-wrap:wrap;margin-bottom:14px"><span class="share num">${shared.length}<span class="muted" style="font-size:20px">/15</span></span><span class="muted" style="font-size:13.5px;max-width:48ch">players in both squads, ${startersShared} of them starting for both. The players below are where these two can gain or lose ground on each other.</span></div>
@@ -1389,7 +1417,7 @@ function renderOwnership() {
       <td>${S.mode === 'plan' ? fxNext(o.p, META.next) : `<span class="num">${o.p.gw}</span>`}</td>
     </tr>${open ? `<tr class="owners"><td colspan="7"><div class="chips">${o.owners.map(id => { const m = findM(id); const s = squadOf(m); const tag = s && s.c === o.id ? ' (C)' : s && s.ids.indexOf(o.id) >= 11 ? ' (bench)' : ''; return `<button class="chipbtn" data-action="open" data-id="${id}">${esc(m.short)}${tag}</button>`; }).join('')}</div></td></tr>` : ''}`;
   }).join('');
-  return `<div class="viewhead"><div><h2>Team ownership</h2><p>Who the team owns across ${esc(modeLabel(S.mode))}. “Team vs FPL” is the team’s ownership minus the global FPL figure, in percentage points: high numbers are the team’s template, negatives are where we’re light. Tap a row to see the owners.</p></div>
+  return `<div class="viewhead"><div><h2>Team ownership</h2><p>Who the team owns across ${esc(modeLabel(S.mode))}${S.mode === 'plan' && META.next ? ` (${M.filter(planOf).length} of ${M.length} entered or uploaded, the rest are best XIs from GW${META.gw} squads; it updates as screenshots come in)` : ''}. “Team vs FPL” is the team’s ownership minus the global FPL figure, in percentage points: high numbers are the team’s template, negatives are where we’re light. Tap a row to see the owners.</p></div>
     <div class="controls"><div class="chips">${posBtns}</div><span class="field"><label class="sr" for="ownsort">Sort</label><select id="ownsort" data-change="ownSort">
       <option value="own" ${S.ownSort === 'own' ? 'selected' : ''}>Most owned</option><option value="cap" ${S.ownSort === 'cap' ? 'selected' : ''}>Most captained</option>
       <option value="edge" ${S.ownSort === 'edge' ? 'selected' : ''}>Team over FPL</option><option value="under" ${S.ownSort === 'under' ? 'selected' : ''}>Team under FPL</option></select></span></div></div>
@@ -1680,7 +1708,7 @@ function render() { if (S.d) { renderHero(); renderFoot(); } renderTabs(); rende
 
 const ACT = {
   tab: t => { S.tab = t.dataset.tab; store.set('tab', S.tab); try { history.replaceState(null, '', '#' + S.tab); } catch (e) { /* ignore */ } render(); },
-  mode: t => { S.mode = t.dataset.mode; store.set('mode', S.mode); render(); },
+  mode: t => { S.mode = t.dataset.mode; store.set('mode2', S.mode); render(); },
   open: t => openSheet(t.dataset.id, t.dataset.view),
   upload: t => { if (S.reading) { toast('Another screenshot is still being read.'); return; } S.uploadFor = +t.dataset.id; shotInput.click(); },
   stopread: () => { if (S.reading) S.reading.ctl.abort(); },
@@ -1884,7 +1912,7 @@ document.addEventListener('submit', ev => {
 async function boot() {
   S.tab = ['table', 'lineups', 'vote', 'squads', 'compare', 'ownership'].includes((location.hash || '').slice(1)) ? location.hash.slice(1) : store.get('tab', 'table');
   S.sort = store.get('sort2', 'or'); if (!SORTS[S.sort]) S.sort = 'or';
-  S.mode = store.get('mode', 'actual');
+  S.mode = store.get('mode2', 'plan');
   const cmp = store.get('cmp', []); S.cmpA = cmp[0] || null; S.cmpB = cmp[1] || null; S.luFx = store.get('lufx', 1) === 3 ? 3 : 1; S.luMode = store.get('lumode', 'three') === 'all' ? 'all' : 'three'; S.lu3 = store.get('lu3', []); S.xpSrc = store.get('xpsrc', 'Solio'); S.luOpt = store.get('luopt', true) !== false;
   render();
   try {
