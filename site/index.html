@@ -1137,7 +1137,7 @@ async function readShot(id, file) {
     if (out.error) { toast(out.error); return; }
     const noHits = out.edit.chip === 'wildcard' || out.edit.chip === 'freehit';
     out.edit.hit = 0; out.edit.askHit = !noHits;
-    openSheet(m.id, 'plan'); S.sheet.edit = out.edit; S.sheet.slot = null; renderSheet();
+    openSheet(m.id, 'plan'); S.sheet.edit = out.edit; S.sheet.slot = null; navPush({ layer: 'edit', kind: 'mgr', id: m.id }); renderSheet();
     const first = document.querySelector('.hitask button'); if (first) first.focus();
   } catch (e) {
     S.reading = null; refreshReading();
@@ -1470,18 +1470,64 @@ function renderOwnership() {
     ${total > 30 ? `<p style="text-align:center"><button class="btn" data-action="ownall">${S.ownAll ? 'Show top 30' : `Show all ${total} players`}</button></p>` : ''}`;
 }
 
+/* ================= Back button =================
+   Each tab change, opened panel and lineup editor is a browser history entry, so the phone's back
+   button steps back through them: editor → panel → previous tab. */
+let navSkip = 0;
+const navTop = () => { const st = history.state; return st && st.mozf ? st : null; };
+function navPush(extra) { try { history.pushState(Object.assign({ mozf: 1, tab: S.tab }, extra || {}), '', '#' + S.tab); } catch (e) { /* history unavailable */ } }
+function navReplace() { try { history.replaceState({ mozf: 1, tab: S.tab }, '', '#' + S.tab); } catch (e) { /* history unavailable */ } }
+// The page closed a layer itself (close button, Save, Cancel): drop its history entries so back doesn't stall on them.
+function navDrop(layers) {
+  const st = navTop(); if (!st || !st.layer) return;
+  const depth = st.layer === 'edit' ? 2 : 1, n = Math.min(depth, layers);
+  if (n > 0) { navSkip++; try { history.go(-n); } catch (e) { navSkip--; } }
+}
+function editDirty() {
+  const e = S.sheet && S.sheet.edit; if (!e) return false;
+  if (e.src === 'screenshot') return true;
+  const m = findM(S.sheet.id), plan = m && planOf(m), b = plan ? planSquad(plan) : m && lineupView(m);
+  if (!b) return false;
+  return JSON.stringify(e.ids) !== JSON.stringify(b.ids) || e.c !== b.c || e.vc !== b.vc || (e.chip || '') !== ((plan && plan.chip) || '') || (+e.hit || 0) !== (plan ? +plan.hit || 0 : 0) || (e.note || '') !== ((plan && plan.note) || '');
+}
+function exitEdit() { if (!S.sheet) return; S.sheet.edit = null; S.sheet.slot = null; S.sheet.picker = false; navDrop(1); }
+window.addEventListener('popstate', ev => {
+  if (navSkip) { navSkip--; return; }
+  const st = ev.state && ev.state.mozf ? ev.state : { tab: (location.hash || '').slice(1) };
+  const layer = st.layer || null;
+  if (S.sheet && S.sheet.edit && layer !== 'edit') {
+    // Back while editing: close the player picker or hit question first, and never throw away unsaved changes.
+    const e = S.sheet.edit;
+    if (S.sheet.slot != null || e.askHit) { S.sheet.slot = null; S.sheet.picker = false; e.askHit = false; navPush({ layer: 'edit', kind: S.sheet.kind, id: S.sheet.id }); renderSheet(); return; }
+    if (editDirty()) { navPush({ layer: 'edit', kind: S.sheet.kind, id: S.sheet.id }); toast('You have unsaved changes. Tap Save lineup, or Cancel to discard them.'); return; }
+    S.sheet.edit = null; S.sheet.slot = null; S.sheet.picker = false;
+    if (layer === 'sheet') { renderSheet(); return; }
+  }
+  if (S.sheet && !layer) closeSheet(true);
+  else if (!S.sheet && layer && st.kind === 'mgr' && findM(st.id)) { openSheet(st.id, null, true); if (layer === 'edit') navReplaceLayer('sheet'); }
+  else if (!S.sheet && layer && st.kind === 'roster') openRoster(true);
+  const tab = ['table', 'lineups', 'vote', 'squads', 'compare', 'ownership'].includes(st.tab) ? st.tab : 'table';
+  if (tab !== S.tab) { S.tab = tab; store.set('tab', S.tab); render(); viewTop(); }
+});
+// After switching tabs, start the new view at its top (just under the hero) if the page was scrolled past it.
+function viewTop() { const sky = document.querySelector('.sky'), y = sky ? sky.offsetHeight : 0; if (window.scrollY > y) window.scrollTo(0, y); }
+function navReplaceLayer(layer) { try { history.replaceState(Object.assign({}, history.state, { layer }), '', location.hash); } catch (e) { /* ignore */ } }
+
 /* ================= Sheet: manager detail ================= */
-function openSheet(id, view) {
+function openSheet(id, view, fromNav) {
   const m = findM(id); if (!m || m.err) return;
+  const wasOpen = !!S.sheet;
   S.sheet = { kind: 'mgr', id: m.id, view: view || (S.mode === 'plan' && planOf(m) ? 'plan' : 'actual'), edit: null, slot: null, picker: false, pq: '', back: document.activeElement };
+  if (!fromNav && !wasOpen) navPush({ layer: 'sheet', kind: 'mgr', id: m.id });
   showSheet();
 }
-function openRoster() { S.sheet = { kind: 'roster', back: document.activeElement, add: '', draft: null }; showSheet(); }
+function openRoster(fromNav) { const wasOpen = !!S.sheet; S.sheet = { kind: 'roster', back: document.activeElement, add: '', draft: null }; if (!fromNav && !wasOpen) navPush({ layer: 'sheet', kind: 'roster' }); showSheet(); }
 function showSheet() {
   renderSheet();
   const sh = $('#sheet'); if (sh.hidden) { sh.hidden = false; document.documentElement.style.overflow = 'hidden'; const x = $('#sheet-in .xbtn'); if (x) x.focus(); }
 }
-function closeSheet() {
+function closeSheet(fromNav) {
+  if (!fromNav) navDrop(2);
   const back = S.sheet && S.sheet.back; S.sheet = null; $('#sheet').hidden = true; document.documentElement.style.overflow = '';
   if (back && back.isConnected) back.focus();
 }
@@ -1585,6 +1631,7 @@ function startEdit() {
   const base = plan ? planSquad(plan) : lineupView(m);
   S.sheet.edit = { ids: [...base.ids], c: base.c, vc: base.vc, chip: plan ? (plan.chip || '') : '', note: plan ? (plan.note || '') : '', orig: new Set(m.actual.ids), src: 'manual', hit: plan ? (+plan.hit || 0) : 0 };
   S.sheet.slot = null; S.sheet.picker = false; S.sheet.pq = '';
+  navPush({ layer: 'edit', kind: 'mgr', id: m.id });
   renderSheet();
 }
 function validate(e, m) {
@@ -1752,7 +1799,7 @@ function renderView() {
 function render() { if (S.d) { renderHero(); renderFoot(); } renderTabs(); renderBanner(); renderView(); if (S.sheet) renderSheet(); }
 
 const ACT = {
-  tab: t => { S.tab = t.dataset.tab; store.set('tab', S.tab); try { history.replaceState(null, '', '#' + S.tab); } catch (e) { /* ignore */ } render(); },
+  tab: t => { if (t.dataset.tab === S.tab) return; S.tab = t.dataset.tab; store.set('tab', S.tab); navPush(); render(); viewTop(); },
   mode: t => { S.mode = t.dataset.mode; store.set('mode2', S.mode); render(); },
   open: t => openSheet(t.dataset.id, t.dataset.view),
   upload: t => { if (S.reading) { toast('Another screenshot is still being read.'); return; } S.uploadFor = +t.dataset.id; shotInput.click(); },
@@ -1788,7 +1835,7 @@ const ACT = {
   roster: () => openRoster(),
   sview: t => { S.sheet.view = t.dataset.v; renderSheet(); },
   edit: () => startEdit(),
-  canceledit: () => { S.sheet.edit = null; S.sheet.slot = null; renderSheet(); },
+  canceledit: () => { exitEdit(); renderSheet(); },
   slot: t => { const i = +t.dataset.i; S.sheet.slot = S.sheet.slot === i ? null : i; S.sheet.picker = false; S.sheet.pq = ''; renderSheet(); },
   slotclose: () => { S.sheet.slot = null; renderSheet(); },
   replace: () => { S.sheet.picker = true; renderSheet(); const i = $('#pq'); if (i) i.focus(); },
@@ -1806,11 +1853,11 @@ const ACT = {
     t.disabled = true;
     const next = JSON.parse(JSON.stringify(S.edits)); next.plans = next.plans || {};
     next.plans[m.id] = { gw: META.next, picks: orderPlan(e), c: e.c, vc: e.vc, chip: e.chip || null, note: e.note.trim(), src: e.src || 'manual', hit: (e.chip === 'wildcard' || e.chip === 'freehit') ? 0 : (+e.hit || 0), at: new Date().toISOString() };
-    if (await saveEdits(next, `GW${META.next} lineup saved for ${m.team}.`)) { S.sheet.edit = null; S.sheet.slot = null; S.sheet.view = 'plan'; render(); } else t.disabled = false;
+    if (await saveEdits(next, `GW${META.next} lineup saved for ${m.team}.`)) { exitEdit(); S.sheet.view = 'plan'; render(); } else t.disabled = false;
   },
   delplan: async () => {
     const m = findM(S.sheet.id); const next = JSON.parse(JSON.stringify(S.edits)); delete next.plans[m.id];
-    if (await saveEdits(next, `GW${META.next} lineup removed for ${m.team}.`)) { S.sheet.edit = null; S.sheet.view = 'actual'; render(); }
+    if (await saveEdits(next, `GW${META.next} lineup removed for ${m.team}.`)) { exitEdit(); S.sheet.view = 'actual'; render(); }
   },
   copyid: t => { const id = t.dataset.id; const done = () => toast(`Copied ID ${id}`); try { navigator.clipboard.writeText(String(id)).then(done, () => toast(`ID ${id}`)); } catch (e) { toast(`ID ${id}`); } },
   togglehide: t => { const d = S.sheet.draft, id = +t.dataset.id; d.hidden = d.hidden.includes(id) ? d.hidden.filter(x => x !== id) : [...d.hidden, id]; renderSheet(); },
@@ -1956,6 +2003,7 @@ document.addEventListener('submit', ev => {
 /* ================= Boot ================= */
 async function boot() {
   S.tab = ['table', 'lineups', 'vote', 'squads', 'compare', 'ownership'].includes((location.hash || '').slice(1)) ? location.hash.slice(1) : store.get('tab', 'table');
+  navReplace();
   S.sort = store.get('sort2', 'or'); if (!SORTS[S.sort]) S.sort = 'or';
   S.mode = store.get('mode2', 'plan');
   const cmp = store.get('cmp', []); S.cmpA = cmp[0] || null; S.cmpB = cmp[1] || null; S.luFx = store.get('lufx', 1) === 3 ? 3 : 1; S.luMode = store.get('lumode', 'three') === 'all' ? 'all' : 'three'; S.lu3 = store.get('lu3', []); S.xpSrc = store.get('xpsrc', 'Solio'); S.luOpt = store.get('luopt', true) !== false;
