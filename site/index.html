@@ -174,6 +174,10 @@ table.club tbody tr:hover { background: var(--surface-2); }
 
 .cards { display: none; gap: 10px; }
 .mcard { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; text-align: left; width: 100%; }
+.mcard .leadfig { display: grid; justify-items: end; line-height: 1; }
+.mcard .leadfig small { font-size: 11px; font-weight: 600; color: var(--muted); margin-top: 3px; white-space: nowrap; }
+.mcard .leadfig .mv, .mcard .leadfig .hit { margin: 0; }
+table.club th.lead { color: var(--accent); }
 .mcard .meta { grid-column: 2 / 4; display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 12.5px; color: var(--muted); align-items: center; }
 @media (max-width: 720px) {
   .tablebox.club-t { display: none; }
@@ -660,7 +664,6 @@ function ownership(mode) {
 const byGW = (a, b) => ((b.gwNet == null ? -999 : b.gwNet) - (a.gwNet == null ? -999 : a.gwNet)) || (b.total - a.total);
 const SORTS = {
   gw: ['GW points', byGW],
-  total: ['Season total', (a, b) => b.total - a.total],
   form: ['Form (last 3)', (a, b) => b.form - a.form || b.total - a.total],
   or: ['Overall rank', (a, b) => (a.or || 9e9) - (b.or || 9e9)],
   xp: ['Next GW expected points', (a, b) => projNet(b) - projNet(a)]
@@ -748,32 +751,42 @@ function renderTable() {
   if (!M.length) return emptyClub();
   const rows = [...M].sort(SORTS[S.sort][1]);
   const gmax = Math.max(1, ...M.flatMap(m => m.H.slice(-5).map(h => h.net)));
-  const head = `<div class="viewhead"><div><h2>Team table</h2><p>GW${META.gw} results for all ${M.length} managers. Tap a row for the full squad, transfers and history.</p></div>
+  const head = `<div class="viewhead"><div><h2>Team table</h2><p>All ${M.length} managers, sorted by ${esc(SORTS[S.sort][0].toLowerCase())}. Tap a row for the full squad, transfers and history.</p></div>
     <div class="controls"><label class="lbl" for="sortsel">Sort by</label><span class="field"><select id="sortsel" data-change="sort">${Object.entries(SORTS).map(([k, v]) => `<option value="${k}" ${k === S.sort ? 'selected' : ''}>${v[0]}</option>`).join('')}</select></span></div></div>`;
+  const lead = S.sort;
+  const xpTxt = m => META.next ? projected(lineupView(m), META.next).toFixed(1) : '–';
+  const xpHit = m => hitOf(planOf(m)) ? ` <span class="hit">${fmtHit(hitOf(planOf(m)))}</span>` : '';
+  const LEAD = {
+    gw: { head: `GW${META.gw}`, cell: m => `<span class="big">${m.gwNet == null ? '–' : m.gwNet}</span>${m.hit ? `<span class="hit">−${m.hit}</span>` : ''}` },
+    or: { head: 'Overall rank', cell: m => `<span class="big">${fmtRank(m.or)}</span>${orMove(m)}` },
+    form: { head: 'Form', title: 'Average points over the last 3 gameweeks', cell: m => `<span class="big">${m.form.toFixed(1)}</span>` },
+    xp: { head: `GW${META.next} xP`, title: `Expected points for each team’s GW${META.next} lineup`, cell: m => `<span class="big">${xpTxt(m)}</span>${xpHit(m)}` }
+  }[lead] || null;
   const tr = rows.map((m, i) => {
     const cap = capOf(m), plan = planOf(m);
     return `<tr data-action="open" data-id="${m.id}" tabindex="0">
       <td class="rankno">${i + 1}</td>
       <td><div class="who"><b>${esc(m.team)}</b><span>${esc(m.who)}</span></div></td>
-      <td class="r"><span class="big">${m.gwNet == null ? '–' : m.gwNet}</span>${m.hit ? `<span class="hit">−${m.hit}</span>` : ''}</td>
+      ${LEAD ? `<td class="r lead">${LEAD.cell(m)}</td>` : ''}
+      ${lead !== 'gw' ? `<td class="r num">${m.gwNet == null ? '–' : m.gwNet}${m.hit ? `<span class="hit">−${m.hit}</span>` : ''}</td>` : ''}
       <td>${spark(m, gmax)}</td>
       <td class="r num">${fmtInt(m.total)}</td>
-      <td class="r num">${fmtRank(m.or)}${orMove(m)}</td>
+      ${lead !== 'or' ? `<td class="r num">${fmtRank(m.or)}${orMove(m)}</td>` : ''}
       <td>${cap ? `${esc(cap.p.name)} <span class="muted num">${cap.pts}</span>` : '—'}</td>
       <td>${m.actual && m.actual.chip ? `<span class="tag gold" title="${esc(chipLong(m.actual.chip))}">${esc(chipShort(m.actual.chip))}</span>` : ''}</td>
       <td class="r num">${fmtM(m.value)}<div class="muted" style="font-size:12px">${fmtM(m.bank)} ITB</div></td>
       <td>${META.next ? (plan ? `<span class="tag ok">Lineup in</span>` : `<span class="tag">—</span>`) : ''}</td>
-      <td class="r num">${META.next ? projected(lineupView(m), META.next).toFixed(1) + (hitOf(planOf(m)) ? ` <span class="hit">${fmtHit(hitOf(planOf(m)))}</span>` : '') : ''}</td>
+      ${lead !== 'xp' ? `<td class="r num">${META.next ? xpTxt(m) + xpHit(m) : ''}</td>` : ''}
     </tr>`;
   }).join('');
-  const table = `<div class="tablebox club-t"><table class="club"><thead><tr><th>#</th><th>Manager</th><th class="r">GW${META.gw}</th><th>Last 5</th><th class="r">Total</th><th class="r">Overall</th><th>Captain</th><th>Chip</th><th class="r">Value</th><th>${META.next ? 'GW' + META.next : ''}</th><th class="r" title="Expected points for each team's GW${META.next} lineup">${META.next ? 'GW' + META.next + ' xP' : ''}</th></tr></thead><tbody>${tr}</tbody></table></div>`;
+  const table = `<div class="tablebox club-t"><table class="club"><thead><tr><th>#</th><th>Manager</th>${LEAD ? `<th class="r lead"${LEAD.title ? ` title="${esc(LEAD.title)}"` : ''}>${LEAD.head}</th>` : ''}${lead !== 'gw' ? `<th class="r">GW${META.gw}</th>` : ''}<th>Last 5</th><th class="r">Total</th>${lead !== 'or' ? '<th class="r">Overall</th>' : ''}<th>Captain</th><th>Chip</th><th class="r">Value</th><th>${META.next ? 'GW' + META.next : ''}</th>${lead !== 'xp' ? `<th class="r" title="Expected points for each team's GW${META.next} lineup">${META.next ? 'GW' + META.next + ' xP' : ''}</th>` : ''}</tr></thead><tbody>${tr}</tbody></table></div>`;
   const cards = `<div class="cards">${rows.map((m, i) => {
     const cap = capOf(m), plan = planOf(m);
     return `<button class="mcard" data-action="open" data-id="${m.id}">
       <span class="rankno">${i + 1}</span>
       <span class="who"><b>${esc(m.team)}</b><span>${esc(m.who)}</span></span>
-      <span class="big">${m.gwNet == null ? '–' : m.gwNet}${m.hit ? `<span class="hit">−${m.hit}</span>` : ''}</span>
-      <span class="meta"><span class="num">Total ${fmtInt(m.total)}</span><span class="num">OR ${fmtRank(m.or)}${orMove(m)}</span>${cap ? `<span>C ${esc(cap.p.name)} ${cap.pts}</span>` : ''}${m.actual && m.actual.chip ? `<span class="tag gold">${esc(chipShort(m.actual.chip))}</span>` : ''}${plan ? '<span class="tag ok">Lineup in</span>' : ''}${META.next ? `<span class="num">GW${META.next} xP ${projected(lineupView(m), META.next).toFixed(1)}${fmtHit(hitOf(planOf(m)))}</span>` : ''}${spark(m, gmax)}</span>
+      <span class="leadfig"><span style="white-space:nowrap">${LEAD ? LEAD.cell(m) : ''}</span><small>${LEAD ? LEAD.head : ''}</small></span>
+      <span class="meta">${lead !== 'gw' ? `<span class="num">GW${META.gw} ${m.gwNet == null ? '–' : m.gwNet}${m.hit ? ` (−${m.hit})` : ''}</span>` : ''}${lead !== 'or' ? `<span class="num">OR ${fmtRank(m.or)}${orMove(m)}</span>` : ''}${lead !== 'xp' && META.next ? `<span class="num">GW${META.next} xP ${xpTxt(m)}${fmtHit(hitOf(planOf(m)))}</span>` : ''}${lead !== 'form' ? `<span class="num">Form ${m.form.toFixed(1)}</span>` : ''}${cap ? `<span>C ${esc(cap.p.name)} ${cap.pts}</span>` : ''}${m.actual && m.actual.chip ? `<span class="tag gold">${esc(chipShort(m.actual.chip))}</span>` : ''}${plan ? '<span class="tag ok">Lineup in</span>' : ''}${spark(m, gmax)}</span>
     </button>`;
   }).join('')}</div>`;
   return head + table + cards;
