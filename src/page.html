@@ -208,6 +208,11 @@ table.club th.lead { color: var(--accent); }
 .pager { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
 .lu { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; transition: opacity .2s; min-width: 0; }
 .lu.dim { opacity: .38; }
+.lu-sec { grid-column: 1 / -1; padding: 6px 2px 0; }
+.lu-sec > div { position: sticky; left: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; width: fit-content; max-width: calc(100vw - 40px); }
+.lu-sec:not(:first-child) { margin-top: 10px; padding-top: 14px; border-top: 1px solid var(--line); }
+.lu-sec b { font-family: var(--f-display); font-weight: 800; font-size: 20px; text-transform: uppercase; letter-spacing: .03em; }
+.lu-sec span { font-size: 12.5px; color: var(--muted); }
 .lu.drop { outline: 2px dashed var(--accent-strong); outline-offset: -5px; }
 .lu-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: start; gap: 6px 8px; padding: 10px 12px 8px; }
 .lu-name { min-width: 0; flex: 1 1 190px; display: grid; gap: 3px; }
@@ -930,7 +935,7 @@ function renderLineups() {
   const how = !S.canWrite ? 'This view is read-only.' : S.canRead ? `Upload a team screenshot on any card and ${OPEN ? 'it’s read automatically' : 'Claude fills in that squad'} for you to check and save.` : 'Use Edit lineup to enter changes.';
   const scale = [1, 2, 3, 4, 5].map(n => `<span class="fx fdr${n}">${n}</span>`).join('');
   const R = luRoster();
-  return `<div class="viewhead"><div><h2>GW${META.next} lineups</h2><p>Deadline ${esc(fmtWhen(META.deadline))}${cd ? ` (in ${cd})` : ''}. ${plans} of ${M.length} lineups entered and shown exactly as entered. The rest show the best XI and captain from their GW${META.gw} squad by ${esc(XPMETA ? XPMETA.source : 'expected')} points. ${how}</p></div>
+  return `<div class="viewhead"><div><h2>GW${META.next} lineups</h2><p>Deadline ${esc(fmtWhen(META.deadline))}${cd ? ` (in ${cd})` : ''}. ${plans} of ${M.length} lineups entered and shown exactly as entered, at the top. The rest show the best XI and captain from their GW${META.gw} squad by ${esc(XPMETA ? XPMETA.source : 'expected')} points. Both groups are sorted by expected points. ${how}</p></div>
     <div class="controls">
       <div class="seg" role="group" aria-label="Fixtures shown"><button data-action="lufx" data-n="1" aria-pressed="${S.luFx !== 3}">GW${META.next}</button><button data-action="lufx" data-n="3" aria-pressed="${S.luFx === 3}">Next 3 GWs</button></div>
       ${XPS.length > 1 ? `<div class="seg" role="group" aria-label="Expected points model">${XPS.map(x => `<button data-action="xpsrc" data-s="${esc(x.source)}" aria-pressed="${XPMETA && XPMETA.source === x.source}" title="Fetched ${esc(fmtWhen(x.fetched))}">${esc(x.source)} xP</button>`).join('')}</div>` : ''}
@@ -993,11 +998,19 @@ function renderLineupGrid() {
   const g = $('#lugrid'); if (!g) return;
   const q = fold(S.lq.trim());
   const three = false;
-  const shown = luRoster();
-  const sq = new Map(shown.map(m => [m.id, lineupView(m)]));
-  const proj = new Map(shown.map(m => [m.id, S.luFx === 3 ? [0, 1, 2].reduce((t, k) => t + projected(lineupView(m, META.next + k), META.next + k), 0) : projected(sq.get(m.id), META.next)]));
-  let best = null, bv = -1e9; proj.forEach((v, id) => { const net = v - hitOf(planOf(findM(id))); if (net > bv) { bv = net; best = id; } });
-  g.innerHTML = shown.map((m, i) => lineupCard(m, q, { three, slot: i, proj, sq, best: shown.length > 1 ? best : null })).join('');
+  const roster = luRoster();
+  const sq = new Map(roster.map(m => [m.id, lineupView(m)]));
+  const proj = new Map(roster.map(m => [m.id, S.luFx === 3 ? [0, 1, 2].reduce((t, k) => t + projected(lineupView(m, META.next + k), META.next + k), 0) : projected(sq.get(m.id), META.next)]));
+  const net = m => proj.get(m.id) - hitOf(planOf(m));
+  let best = null, bv = -1e9; roster.forEach(m => { if (net(m) > bv) { bv = net(m); best = m.id; } });
+  // Lineups that have been uploaded or entered come first; each group is sorted by expected points (after hits).
+  const byXp = (a, b) => net(b) - net(a);
+  const inn = roster.filter(planOf).sort(byXp), rest = roster.filter(m => !planOf(m)).sort(byXp);
+  const shown = [...inn, ...rest];
+  const sec = (t, n) => `<div class="lu-sec"><div><b>${t}</b><span>${n}</span></div></div>`;
+  const card = (m, i) => lineupCard(m, q, { three, slot: i, proj, sq, best: shown.length > 1 ? best : null });
+  g.innerHTML = (inn.length ? sec(`GW${META.next} lineups in`, `${inn.length} of ${roster.length} · by expected points`) + inn.map(card).join('') : '')
+    + (rest.length ? sec(inn.length ? 'Waiting for a lineup' : `GW${META.next} lineups`, `${rest.length} · best XI from the GW${META.gw} squad, by expected points`) + rest.map((m, i) => card(m, inn.length + i)).join('') : '');
   const f = $('#lufind');
   if (f) { if (!q) f.textContent = ''; else { const n = M.filter(m => { const s = lineupSquad(m); return s && s.ids.some(id => fold((P.get(id) || {}).name).includes(q)); }).length; f.textContent = n ? `${n} of ${M.length} squads include a player matching “${S.lq.trim()}”${three ? ' (whole team)' : ''}` : 'No squad has a player matching that name.'; } }
 }
