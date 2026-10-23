@@ -149,8 +149,17 @@
     ? nativeFetch(API + (API.includes('?') ? '&' : '?') + 'action=ping', { cache: 'no-store' }).then(r => r.json()).then(j => { if (j && j.ok) info = j; }).catch(() => { /* backend unreachable: view-only */ })
     : Promise.resolve();
 
+  // Live SKLW scores: the backend reads FPL (browsers can't) and scores each manager in the team sheets.
+  async function live(gw, ids) {
+    await ready;
+    if (!ON || !info.live) throw fail('unsupported');
+    const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 90000);
+    try { return await send({ action: 'live', gw, ids }, { signal: ctl.signal }); } finally { clearTimeout(timer); }
+  }
+
   window.claude = {
     open: true,
+    live,
     async use(name) {
       await ready;
       if (!ON) return null;

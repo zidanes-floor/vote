@@ -13,6 +13,8 @@ squads, head-to-heads and ownership.
 | FPL data (squads, points, fixtures, prices) | `site/data/fpl.json`, built by `scripts/sync.mjs` + `scripts/build.py` | automatically every hour (GitHub Actions), or *Actions → Sync FPL data and publish → Run workflow* |
 | Solio expected points | a scheduled Claude task reads Solio's Projections table in the club admin's signed-in browser (`tools/solio-reader.js`) and sends it to the Sheet; the sync matches it to FPL players into `raw/xp_solio.json` | every 3 hours while that computer is on (Claude scheduled task), published within the hour; FPL's own estimate fills in for any gameweek Solio doesn't cover |
 | Saved lineups, member-list changes, votes | the club Google Sheet (`apps-script/Code.gs`, deployed as a web app) | live |
+| SKLW tab (fixtures, results, league tables) | read in the browser from the tournament's public Google Sheets (main sheet + live score sheet) | every time the tab is open, every 2 minutes |
+| SKLW live match and live tables | team sheets from the live score sheet's match tabs; points from the official FPL site through the web app (`live` action: auto-subs, provisional bonus, SKLW rules — Triple Captain counts as a normal captain, Bench Boost bench doesn't count, hits deducted) | every minute during a gameweek; falls back to the live sheet's numbers if FPL can't be reached |
 | Screenshot reading | the same web app, calling Google's Gemini API (free tier) with the key stored in the Sheet's script properties | live, capped per day |
 
 Anyone with the link can view, save lineups, vote, upload screenshots and change the member list.
