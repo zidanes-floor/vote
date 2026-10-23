@@ -1420,7 +1420,7 @@ function skTables(rows, withPlayed) {
     }
     out[lg[0]] = list;
   });
-  rows.forEach(r => r.forEach(c => { if (/^\*+\s*\S/.test(c.trim()) && c.length > 12 && !notes.includes(c.trim())) notes.push(c.trim()); }));
+  rows.forEach(r => r.forEach(c => c.split(/\r?\n/).forEach(line => { const t = line.trim(); if (/^\*+\s*\S/.test(t) && t.length > 12 && !notes.includes(t)) notes.push(t); })));
   return { leagues: out, notes };
 }
 function skFixtures(rows) {
