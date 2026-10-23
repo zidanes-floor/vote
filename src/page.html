@@ -371,13 +371,13 @@ table.sk-t .tn { overflow-wrap: anywhere; }
 .sk-note { font-size: 12px; margin: 8px 0 0; }
 .sk-score .t small { display: block; font-size: 12px; font-weight: 500; color: var(--muted); margin-top: 2px; }
 .duel .dn small { font-weight: 500; color: var(--muted); font-size: 12px; }
-.sk-left { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 10px; margin: -4px 0 14px; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); }
-.sk-left > div { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.sk-left { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 10px; margin: -4px 0 14px; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); }
+.sk-left > div { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.sk-left small { display: block; font-size: 11.5px; color: var(--muted); }
 .sk-left > div:last-child { flex-direction: row-reverse; text-align: right; }
 .sk-left b { font-family: var(--f-display); font-weight: 900; font-size: 28px; line-height: 1; }
 .sk-left > div.us b { color: var(--accent); }
 .sk-left span { font-size: 12.5px; color: var(--ink-2); }
-.sk-left .vs { font-size: 12px; color: var(--muted); }
 .sk-ml li { display: grid; grid-template-columns: minmax(0, 1fr) auto 2.4em; gap: 8px; align-items: center; }
 .sk-ml li.sep { display: block; }
 .sk-ml .who { min-width: 0; }
@@ -790,6 +790,9 @@ function renderTabs() {
   const skTab = document.querySelector('.tab[data-tab="sklw"]'); if (skTab) skTab.hidden = !OPEN;
   if (!OPEN && S.tab === 'sklw') S.tab = 'table';
   document.querySelectorAll('.tab').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === S.tab)));
+  // On narrow screens the tab strip scrolls sideways: keep the open tab in view.
+  const strip = $('#tabs'), on = strip && strip.querySelector('.tab[aria-selected="true"]');
+  if (on && strip.scrollWidth > strip.clientWidth) { const l = on.offsetLeft - strip.offsetLeft, r = l + on.offsetWidth; if (l < strip.scrollLeft) strip.scrollLeft = l - 8; else if (r > strip.scrollLeft + strip.clientWidth) strip.scrollLeft = r - strip.clientWidth + 8; }
   const showMode = (S.tab === 'compare' || S.tab === 'ownership') && META.next;
   const plans = M.filter(planOf).length;
   $('#tabtools').innerHTML = (showMode ? `<div class="seg" role="group" aria-label="Which squads">
@@ -1621,13 +1624,13 @@ function skLiveCentre(t, r, L) {
   };
   const list = s => [row(s.k, 'GK'), ...s.st.map(x => row(x, 'ST')), ...[...s.sq].sort((a, b) => b.pts - a.pts).map(x => row(x, ''))].join('') + (s.bn.length ? '<li class="sep">Bench</li>' + s.bn.map(x => row(x, '', true)).join('') : '');
   const side = (s, us) => `<span class="t ${us ? 'us' : ''}">${esc(s.name)}</span>`;
-  const leftBox = (s, us) => `<div class="${us ? 'us' : ''}"><b class="num">${s.left}</b><span>player${s.left === 1 ? '' : 's'} left${s.now ? ` · ${s.now} playing` : ''}</span></div>`;
+  const leftBox = (s, us) => `<div class="${us ? 'us' : ''}"><b class="num">${s.left}</b><span>player${s.left === 1 ? '' : 's'} left<small>${s.now ? `${s.now} playing now` : allDone ? 'all done' : 'none playing now'}</small></span></div>`;
   const ago = fmtAgo(L.fpl.at || new Date(L.okAt).toISOString());
   const status = allDone ? 'All Premier League games done · waiting for SKLW to confirm' : `${fx.done || 0} of ${fx.n || 0} PL games done${fx.now ? ` · ${fx.now} on now` : ''}`;
   return `<section class="panel sk-live">
     <div class="sk-lh"><span class="tag ${allDone ? '' : 'live'}">${allDone ? 'FT' : 'Live'} · GW${L.gw}</span><span class="muted">Live from FPL · updated ${esc(ago)} · ${status}</span></div>
     <div class="sk-score">${side(r.H, usHome)}<span class="s num">${r.hg}<i>–</i>${r.ag}</span>${side(r.A, !usHome)}</div>
-    <div class="sk-left" role="group" aria-label="Players still to play">${leftBox(r.H, usHome)}<div class="vs">to play</div>${leftBox(r.A, !usHome)}</div>
+    <div class="sk-left" role="group" aria-label="Players still to play">${leftBox(r.H, usHome)}${leftBox(r.A, !usHome)}</div>
     <div class="sk-duels">
       <div><h4>Our strikers vs their keeper</h4>${U.st.map((s, i) => duel(s, uSt[i], O.k)).join('')}</div>
       <div><h4>Their strikers vs our keeper</h4>${O.st.map((s, i) => duel(s, oSt[i], U.k)).join('')}</div>
