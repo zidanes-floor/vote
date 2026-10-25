@@ -85,6 +85,7 @@ if (bad.length === managers.length) { console.error('Every manager failed to loa
 
 await writeFile('raw/catalog.json', JSON.stringify(catalog));
 await solio(b);
+await sklwTeams(cur).catch(e => console.log('SKLW teams: skipped,', e.message));
 await writeFile('raw/managers.json', JSON.stringify(managers));
 console.log(`GW${cur.id}${cur.finished ? ' (finished)' : ''}, next GW${nxt ? nxt.id : '-'}; ${players.length} players; ${managers.length} managers` + (bad.length ? `; failed: ${bad.map(m => m.id + ':' + m.err).join(', ')}` : ''));
 
@@ -115,4 +116,63 @@ async function solio(b) {
   }
   await writeFile('raw/xp_solio.json', JSON.stringify({ source: 'Solio', url: 'https://fpl.solioanalytics.com', fetched: d.fetched, gws: d.gws, rows }));
   console.log(`Solio: ${rows.length} players for GW${d.gws.join('/')}, read ${d.fetched}` + (missed.length ? `; unmatched ${missed.length}: ${missed.slice(0, 12).join(', ')}` : ''));
+}
+
+// ---------- SKLW: every manager in this gameweek's SKLW team sheets → their FPL team ----------
+// The team sheets are the tournament's public live score sheet (one tab per match). The teams are fixed once the
+// deadline passes, so each is fetched once per gameweek into site/data/sklw.json; the site's web app uses it for
+// live scoring when FPL is slow to answer it, and the page uses it to list the players left to play.
+async function sklwTeams(cur) {
+  const LIVE = '1E8TGqNufhI9YDaWLoet_SIhjYDoZQbKNQR7ivwUIXFQ';
+  const sheet = async name => {
+    const r = await fetch(`https://docs.google.com/spreadsheets/d/${LIVE}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(name)}`);
+    if (!r.ok) throw new Error(`the ${name} sheet answered ${r.status}`);
+    return parseCSV(await r.text());
+  };
+  const ls = await sheet('LiveScores');
+  const gw = Number(((ls[0] || [])[2] || '').trim());
+  if (gw !== cur.id) { console.log(`SKLW teams: the live sheet is on GW${gw || '?'} and FPL on GW${cur.id}, nothing to collect`); return; }
+  const tabs = ls.filter(r => /^M\d+$/.test((r[2] || '').trim()) && (r[3] || '').trim() && (r[7] || '').trim()).map(r => r[2].trim());
+  const ids = new Set();
+  for (const tab of tabs) {
+    const rows = await sheet(tab);
+    const s = rows.findIndex(r => /^\d+$/.test((r[2] || '').trim()) && (r[3] || '').trim());
+    if (s < 1) continue;
+    rows.slice(s, s + 17).forEach(r => [r[2], r[11]].forEach(v => { if (/^\d+$/.test((v || '').trim())) ids.add(Number(v)); }));
+  }
+  let prev = null;
+  try { prev = JSON.parse(await readFile('site/data/sklw.json', 'utf8')); } catch (e) { /* first run */ }
+  const picks = prev && prev.gw === gw && prev.picks ? prev.picks : {};
+  const todo = [...ids].filter(id => picks[id] === undefined);
+  let got = 0, failed = 0;
+  const pack = d => {
+    const p = (d.picks || []).slice().sort((a, c) => a.position - c.position);
+    const find = k => (p.find(x => x[k]) || {}).element || 0;
+    return p.map(x => x.element).join(',') + '|' + find('is_captain') + '|' + find('is_vice_captain') + '|' + (d.active_chip || '') + '|' + ((d.entry_history || {}).event_transfers_cost || 0);
+  };
+  for (let i = 0; i < todo.length; i += 4) {
+    await Promise.all(todo.slice(i, i + 4).map(async id => {
+      const d = await j(`/entry/${id}/event/${gw}/picks/`);
+      if (d.__err === 404) picks[id] = '';
+      else if (d.__err) failed++;
+      else { picks[id] = pack(d); got++; }
+    }));
+  }
+  if (!todo.length && prev && prev.gw === gw) { console.log(`SKLW teams: all ${ids.size} GW${gw} teams already collected`); return; }
+  await writeFile('site/data/sklw.json', JSON.stringify({ gw, fetched: new Date().toISOString(), matches: tabs.length, picks }));
+  console.log(`SKLW teams: GW${gw}, ${tabs.length} matches, ${ids.size} managers; fetched ${got} now` + (failed ? `, ${failed} failed (next run retries)` : ''));
+}
+
+function parseCSV(text) {
+  const rows = []; let row = [], cur = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"' && text[i + 1] === '"') { cur += '"'; i++; } else if (c === '"') q = false; else cur += c; }
+    else if (c === '"') q = true;
+    else if (c === ',') { row.push(cur); cur = ''; }
+    else if (c === '\n') { row.push(cur); rows.push(row); row = []; cur = ''; }
+    else if (c !== '\r') cur += c;
+  }
+  if (cur !== '' || row.length) { row.push(cur); rows.push(row); }
+  return rows;
 }

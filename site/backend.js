@@ -150,11 +150,11 @@
     : Promise.resolve();
 
   // Live SKLW scores: the backend reads FPL (browsers can't) and scores each manager in the team sheets.
-  async function live(gw, ids) {
+  async function live(gw, ids, raw) {
     await ready;
     if (!ON || !info.live) throw fail('unsupported');
     const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 90000);
-    try { return await send({ action: 'live', gw, ids }, { signal: ctl.signal }); } finally { clearTimeout(timer); }
+    try { return await send({ action: 'live', gw, ids, raw: raw && raw.length ? raw : undefined }, { signal: ctl.signal }); } finally { clearTimeout(timer); }
   }
 
   window.claude = {

@@ -36,6 +36,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add site/data/fpl.json raw/xp_solio.json
+          if [ -f site/data/sklw.json ]; then git add site/data/sklw.json; fi
           if git diff --cached --quiet; then echo "No changes"; else
             git commit -m "Sync FPL data"
             git pull --rebase origin main && git push

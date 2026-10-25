@@ -189,7 +189,8 @@ function dayKey_() { return 'READS_' + Utilities.formatDate(new Date(), 'Asia/Ko
 const FPL_API = 'https://fantasy.premierleague.com/api/';
 const FPL_HEADERS = { 'User-Agent': 'Mozilla/5.0 (compatible; zidanes-floor/1.0)', Accept: 'application/json' };
 const LIVE_TTL = 60;          // seconds
-const PICKS_PER_CALL = 90;    // GW teams fetched per request; the rest arrive with the next refresh
+const PICKS_PER_CALL = 30;    // GW teams fetched from FPL per request; the rest arrive with the next refresh
+const SITE_PICKS = 'https://zidanes-floor.github.io/vote/data/sklw.json';   // the same teams, collected by the site's hourly sync
 
 function live_(body) {
   const gw = Number(body.gw);
@@ -201,14 +202,21 @@ function live_(body) {
   const dl = boot.deadlines[gw];
   if (!dl || new Date(dl) > new Date()) return { ok: true, gw: gw, started: false };
   const base = liveBase_(gw, boot);
-  const picks = livePicks_(gw, ids);
+  const got = livePicks_(gw, ids), picks = got.map;
   const m = {};
   let waiting = 0;
   ids.forEach(id => {
     const p = picks[id];
     if (p === undefined) { m[id] = null; waiting++; } else m[id] = p ? sklwScore(p, base) : 0;
   });
-  return { ok: true, gw: gw, started: true, at: base.at, fx: base.fx, m: m, waiting: waiting };
+  const res = { ok: true, gw: gw, started: true, at: base.at, fx: base.fx, m: m, waiting: waiting, diag: got.diag };
+  // raw: the page can ask for the teams themselves plus every player's live state, to work out more on its side
+  // (players left to play, who is captain…) without this script needing changes.
+  if (Array.isArray(body.raw)) {
+    res.e = base.e; res.t = base.t; res.p = {};
+    body.raw.slice(0, 120).forEach(x => { const id = Number(x); if (picks[id] !== undefined) res.p[id] = picks[id]; });
+  }
+  return res;
 }
 
 function fplGet_(path) {
@@ -243,26 +251,39 @@ function liveBase_(gw, boot) {
 }
 
 // Each manager's GW team as "e1,…,e15|captain|vice|chip|hit" ('' = no team this GW).
+// Sources, in order: this script's cache and "picks" tab, the site's hourly sync, then FPL itself.
 function livePicks_(gw, ids) {
-  const cache = CacheService.getScriptCache(), key = 'fpl:picks:' + gw;
+  const cache = CacheService.getScriptCache(), key = 'fpl:picks:' + gw, diag = {};
   let map = parse_(cache.get(key) || 'null');
   if (!map) {
     map = {};
     rows_('picks').forEach(r => { if (Number(r[0]) === gw) map[String(r[1])] = String(r[2]); });
   }
-  const missing = ids.filter(id => map[id] === undefined);
-  if (!missing.length) return map;
+  let missing = ids.filter(id => map[id] === undefined);
+  if (missing.length) {
+    const site = sitePicks_(gw);
+    if (site) {
+      missing.forEach(id => { if (site[id] !== undefined) map[id] = String(site[id]); });
+      diag.site = missing.length - (missing = ids.filter(id => map[id] === undefined)).length;
+      if (diag.site) { try { cache.put(key, JSON.stringify(map), 21600); } catch (e) { /* fine */ } }
+    }
+  }
+  if (!missing.length) return { map: map, diag: diag };
+  if (cache.get('fpl:slow')) { diag.backoff = 1; return { map: map, diag: diag }; }   // FPL asked us to slow down
   const lock = LockService.getScriptLock();
-  if (!lock.tryLock(500)) return map;   // another viewer's request is fetching them right now
+  if (!lock.tryLock(500)) return { map: map, diag: diag };   // another viewer's request is fetching them right now
   try {
     const batch = missing.slice(0, PICKS_PER_CALL);
     const res = UrlFetchApp.fetchAll(batch.map(id => ({ url: FPL_API + 'entry/' + id + '/event/' + gw + '/picks/', headers: FPL_HEADERS, muteHttpExceptions: true })));
     const rows = [];
+    diag.fpl = {};
     res.forEach((r, i) => {
       const code = r.getResponseCode();
+      diag.fpl[code] = (diag.fpl[code] || 0) + 1;
       if (code === 200) { const p = sklwPack(JSON.parse(r.getContentText())); map[batch[i]] = p; rows.push([gw, batch[i], p, new Date()]); }
       else if (code === 404) map[batch[i]] = '';
     });
+    if (diag.fpl[429] || diag.fpl[403]) cache.put('fpl:slow', '1', 120);
     if (rows.length) {
       const sh = sheet_('picks');
       if (sh.getLastRow() > 5000) {   // keep the tab small: drop older gameweeks
@@ -274,7 +295,22 @@ function livePicks_(gw, ids) {
     }
     try { cache.put(key, JSON.stringify(map), 21600); } catch (e) { /* read from the tab next time */ }
   } finally { lock.releaseLock(); }
-  return map;
+  return { map: map, diag: diag };
+}
+
+// The SKLW teams the site's hourly GitHub sync collected (kept 10 minutes).
+function sitePicks_(gw) {
+  const cache = CacheService.getScriptCache(), key = 'site:picks:' + gw;
+  const hit = cache.get(key);
+  if (hit) return parse_(hit);
+  let picks = {};
+  try {
+    const r = UrlFetchApp.fetch(SITE_PICKS + '?t=' + Date.now(), { muteHttpExceptions: true });
+    const d = r.getResponseCode() === 200 ? parse_(r.getContentText()) : null;
+    if (d && Number(d.gw) === gw && d.picks) picks = d.picks;
+  } catch (e) { /* the site is optional */ }
+  try { cache.put(key, JSON.stringify(picks), 600); } catch (e) { /* fine */ }
+  return picks;
 }
 
 /* Pure scoring functions (no Google services), also used by the tests. */
@@ -282,13 +318,16 @@ function livePicks_(gw, ids) {
 // From FPL's live points and fixtures: player id → [points incl. provisional bonus, minutes, state, position]
 // where state is 0 = still to play, 1 = playing now, 2 = done (or no game this GW).
 function sklwBase(live, fixtures, el) {
-  const fx = {}, byTeam = {}, bonus = {};
+  const fx = {}, byTeam = {}, bonus = {}, t = {};
   let done = 0, now = 0;
   fixtures.forEach(f => {
     const st = (f.finished || f.finished_provisional) ? 2 : f.started ? 1 : 0;
     if (st === 2) done++; else if (st === 1) now++;
     fx[f.id] = st;
-    [f.team_h, f.team_a].forEach(t => { (byTeam[t] = byTeam[t] || []).push(f.id); });
+    [f.team_h, f.team_a].forEach(c => { (byTeam[c] = byTeam[c] || []).push(f.id); });
+    // club → [kick-off, state, minutes, opponent, home?] for each of its games this GW
+    (t[f.team_h] = t[f.team_h] || []).push([f.kickoff_time || '', st, f.minutes || 0, f.team_a, 1]);
+    (t[f.team_a] = t[f.team_a] || []).push([f.kickoff_time || '', st, f.minutes || 0, f.team_h, 0]);
     const stat = id => (f.stats || []).filter(s => s.identifier === id)[0];
     const conf = stat('bonus'), bps = stat('bps');
     if (!f.started || !bps || (conf && (conf.h.length || conf.a.length))) return;
@@ -310,7 +349,7 @@ function sklwBase(live, fixtures, el) {
     const s = p.stats || {};
     e[p.id] = [(s.total_points || 0) + (s.bonus ? 0 : (bonus[p.id] || 0)), s.minutes || 0, state, info[1]];
   });
-  return { fx: { n: fixtures.length, done: done, now: now }, e: e };
+  return { fx: { n: fixtures.length, done: done, now: now }, e: e, t: t };
 }
 
 function sklwPack(d) {
