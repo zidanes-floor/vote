@@ -429,6 +429,7 @@ table.sk-t .tn { overflow-wrap: anywhere; }
 .sk-pl .po { text-align: right; white-space: nowrap; }
 .sk-pl .pf .on { color: var(--good); font-weight: 600; }
 .sk-ml .who small.tp { color: var(--ink-2); }
+.sk-more summary { cursor: pointer; color: var(--accent); font-size: 12.5px; font-weight: 600; margin: 5px 0 3px; }
 
 /* ---------- Compare ---------- */
 .cmp-pick { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px; align-items: center; margin-bottom: 18px; }
@@ -1704,11 +1705,14 @@ function skPlayersLeft(t, usHome, L) {
     const rows = [...mine.map.values()].map(o => Object.assign(o, { g: skNextGame(o.el, L) }))
       .sort((a, b) => b.n - a.n || b.c - a.c || a.g.at.localeCompare(b.g.at) || ((P.get(a.el) || {}).name || '').localeCompare((P.get(b.el) || {}).name || ''));
     const total = rows.reduce((a, o) => a + o.n, 0);
-    const li = rows.map(o => {
+    const who = isUs ? 'they have' : 'we have';
+    const li = o => {
       const pl = P.get(o.el) || { name: '#' + o.el, team: 0 }, vs = (other.map.get(o.el) || {}).n || 0, diff = o.n - vs;
-      return `<li class="${diff > 0 ? 'diff' : ''}"><span class="pn">${esc(pl.name)} <small>${esc(tshort(pl.team))}</small></span><span class="pc num">×${o.n}${o.c ? `<small> ${o.c} C</small>` : ''}</span><span class="pf">${o.g.txt}${o.sub ? ` · <span class="muted">${o.sub > 1 ? o.sub + ' as subs' : 'as a sub'}</span>` : ''}</span><span class="po">${vs ? `they have ${vs}` : 'they have none'}</span></li>`;
-    }).join('');
-    return `<div class="${isUs ? 'us' : ''}"><h5>${label} <b class="num">${total}</b> to play</h5>${rows.length ? `<ul class="sk-pl">${li}</ul>` : '<p class="muted">Nobody left to play.</p>'}${mine.missing ? `<p class="muted sk-note">${mine.missing} team${mine.missing > 1 ? 's' : ''} still loading.</p>` : ''}</div>`;
+      return `<li class="${diff > 0 ? 'diff' : ''}"><span class="pn">${esc(pl.name)} <small>${esc(tshort(pl.team))}</small></span><span class="pc num">×${o.n}${o.c ? `<small> ${o.c}C</small>` : ''}</span><span class="pf">${o.g.txt}${o.sub ? ` · <span class="muted">${o.sub > 1 ? o.sub + ' as subs' : 'as a sub'}</span>` : ''}</span><span class="po">${vs ? `${who} ${vs}` : `${who} none`}</span></li>`;
+    };
+    const k = 'plmore-' + (isUs ? 'us' : 'them'), head = rows.slice(0, 10), rest = rows.slice(10);
+    const lists = rows.length ? `<ul class="sk-pl">${head.map(li).join('')}</ul>${rest.length ? `<details class="sk-more" data-skd="${k}" ${skOpen(k)}><summary>${rest.length} more</summary><ul class="sk-pl">${rest.map(li).join('')}</ul></details>` : ''}` : '<p class="muted">Nobody left to play.</p>';
+    return `<div class="${isUs ? 'us' : ''}"><h5>${label} <b class="num">${total}</b> to play</h5>${lists}${mine.missing ? `<p class="muted sk-note">${mine.missing} team${mine.missing > 1 ? 's' : ''} still loading.</p>` : ''}</div>`;
   };
   return `<div class="sk-plw">
     <div class="sk-plh"><h4>Players left to play</h4><div class="seg" role="group" aria-label="Whose players"><button data-action="skscope" data-s="team" aria-pressed="${scope === 'team'}">Whole team</button><button data-action="skscope" data-s="squad" aria-pressed="${scope === 'squad'}">Squad of 11</button></div></div>
