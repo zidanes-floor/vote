@@ -409,7 +409,7 @@ table.sk-t .tn { overflow-wrap: anywhere; }
 .sk-pl .pn small, .sk-pl .pc small { font-weight: 500; color: var(--muted); font-size: 11px; }
 .sk-pl .pc { font-family: var(--f-display); font-weight: 800; font-size: 17px; text-align: right; }
 .sk-pl .pf, .sk-pl .po { font-size: 11.5px; color: var(--muted); }
-.sk-pl .po { text-align: right; white-space: nowrap; }
+.sk-pl .po { text-align: right; }
 .sk-pl .pf .on { color: var(--good); font-weight: 600; }
 .sk-ml .who small.tp { color: var(--ink-2); }
 .sk-more summary { cursor: pointer; color: var(--accent); font-size: 12.5px; font-weight: 600; margin: 5px 0 3px; }
@@ -1675,23 +1675,31 @@ function skPlayersLeft(t, usHome, L) {
   const scope = S.skScope === 'squad' ? 'squad' : 'team';
   const U = usHome ? t.home : t.away, O = usHome ? t.away : t.home;
   const us = skLeftCount(U, L, scope), them = skLeftCount(O, L, scope);
-  const col = (mine, other, label, isUs) => {
-    const rows = [...mine.map.values()].map(o => Object.assign(o, { g: skNextGame(o.el, L) }))
-      .sort((a, b) => b.n - a.n || b.c - a.c || a.g.at.localeCompare(b.g.at) || ((P.get(a.el) || {}).name || '').localeCompare((P.get(b.el) || {}).name || ''));
-    const total = rows.reduce((a, o) => a + o.n, 0);
-    const who = isUs ? 'they have' : 'we have';
+  // Effective players left: a captain counts twice, and players both sides still have cancel out,
+  // so 7 of ours against 6 of theirs is 1 for us.
+  const eff = o => (o ? o.n + o.c : 0);
+  const net = [];
+  new Set([...us.map.keys(), ...them.map.keys()]).forEach(el => {
+    const a = us.map.get(el), b = them.map.get(el), d = eff(a) - eff(b);
+    if (d) net.push({ el, d, a, b, g: skNextGame(el, L) });
+  });
+  const byName = el => (P.get(el) || {}).name || '';
+  const desc = (x, c) => x ? `${x.n}${x.c ? ` (${x.c} C)` : ''}` + (x.sub ? ` · ${x.sub > 1 ? x.sub + ' as subs' : '1 as a sub'}` : '') : 'none';
+  const col = (rows, label, isUs, missing) => {
+    rows.sort((x, y) => Math.abs(y.d) - Math.abs(x.d) || x.g.at.localeCompare(y.g.at) || byName(x.el).localeCompare(byName(y.el)));
+    const total = rows.reduce((a, o) => a + Math.abs(o.d), 0);
     const li = o => {
-      const pl = P.get(o.el) || { name: '#' + o.el, team: 0 }, vs = (other.map.get(o.el) || {}).n || 0, diff = o.n - vs;
-      return `<li class="${diff > 0 ? 'diff' : ''}"><span class="pn">${esc(pl.name)} <small>${esc(tshort(pl.team))}</small></span><span class="pc num">×${o.n}${o.c ? `<small> ${o.c}C</small>` : ''}</span><span class="pf">${o.g.txt}${o.sub ? ` · <span class="muted">${o.sub > 1 ? o.sub + ' as subs' : 'as a sub'}</span>` : ''}</span><span class="po">${vs ? `${who} ${vs}` : `${who} none`}</span></li>`;
+      const pl = P.get(o.el) || { name: '#' + o.el, team: 0 };
+      return `<li class="diff"><span class="pn">${esc(pl.name)} <small>${esc(tshort(pl.team))}</small></span><span class="pc num">×${Math.abs(o.d)}</span><span class="pf">${o.g.txt}</span><span class="po">us ${desc(o.a)} · them ${desc(o.b)}</span></li>`;
     };
     const k = 'plmore-' + (isUs ? 'us' : 'them'), head = rows.slice(0, 10), rest = rows.slice(10);
-    const lists = rows.length ? `<ul class="sk-pl">${head.map(li).join('')}</ul>${rest.length ? `<details class="sk-more" data-skd="${k}" ${skOpen(k)}><summary>${rest.length} more</summary><ul class="sk-pl">${rest.map(li).join('')}</ul></details>` : ''}` : '<p class="muted">Nobody left to play.</p>';
-    return `<div class="${isUs ? 'us' : ''}"><h5>${label} <b class="num">${total}</b> to play</h5>${lists}${mine.missing ? `<p class="muted sk-note">${mine.missing} team${mine.missing > 1 ? 's' : ''} still loading.</p>` : ''}</div>`;
+    const lists = rows.length ? `<ul class="sk-pl">${head.map(li).join('')}</ul>${rest.length ? `<details class="sk-more" data-skd="${k}" ${skOpen(k)}><summary>${rest.length} more</summary><ul class="sk-pl">${rest.map(li).join('')}</ul></details>` : ''}` : `<p class="muted">${isUs ? 'Nothing of ours left that they don’t match.' : 'Nothing of theirs left that we don’t match.'}</p>`;
+    return `<div class="${isUs ? 'us' : ''}"><h5>${label} <b class="num">${total}</b> effective left</h5>${lists}${missing ? `<p class="muted sk-note">${missing} team${missing > 1 ? 's' : ''} still loading.</p>` : ''}</div>`;
   };
   return `<div class="sk-plw">
-    <div class="sk-plh"><h4>Players left to play</h4><div class="seg" role="group" aria-label="Whose players"><button data-action="skscope" data-s="team" aria-pressed="${scope === 'team'}">Whole team</button><button data-action="skscope" data-s="squad" aria-pressed="${scope === 'squad'}">Squad of 11</button></div></div>
-    <p class="muted sk-note" style="margin:0 0 8px">How many of each side’s managers still have each player to come${scope === 'squad' ? ' (squad of 11 only)' : ' (strikers, keeper and squad of 11)'}; “C” counts the captains. Highlighted when we have more of him than they do.</p>
-    <div class="sk-plg">${col(us, them, 'Us', true)}${col(them, us, 'Them', false)}</div>
+    <div class="sk-plh"><h4>Effective players left</h4><div class="seg" role="group" aria-label="Whose players"><button data-action="skscope" data-s="team" aria-pressed="${scope === 'team'}">Whole team</button><button data-action="skscope" data-s="squad" aria-pressed="${scope === 'squad'}">Squad of 11</button></div></div>
+    <p class="muted sk-note" style="margin:0 0 8px">Players still to play once both sides’ cancel out${scope === 'squad' ? ' (squad of 11 only)' : ' (strikers, keeper and squad of 11)'}: if we have 7 of a player and they have 6, that’s 1 for us. A captain counts twice.</p>
+    <div class="sk-plg">${col(net.filter(o => o.d > 0), 'Us', true, us.missing)}${col(net.filter(o => o.d < 0), 'Them', false, them.missing)}</div>
   </div>`;
 }
 
