@@ -1698,7 +1698,7 @@ function skPlayersLeft(t, usHome, L) {
   };
   return `<div class="sk-plw">
     <div class="sk-plh"><h4>Effective players left</h4><div class="seg" role="group" aria-label="Whose players"><button data-action="skscope" data-s="team" aria-pressed="${scope === 'team'}">Whole team</button><button data-action="skscope" data-s="squad" aria-pressed="${scope === 'squad'}">Squad of 11</button></div></div>
-    <p class="muted sk-note" style="margin:0 0 8px">Players still to play once both sides’ cancel out${scope === 'squad' ? ' (squad of 11 only)' : ' (strikers, keeper and squad of 11)'}: if we have 7 of a player and they have 6, that’s 1 for us. A captain counts twice.</p>
+    <p class="muted sk-note" style="margin:0 0 8px">Players still to play, after the ones both sides have cancel out${scope === 'squad' ? ' (squad of 11 only)' : ' (strikers, keeper and squad of 11)'}: if we have 7 of a player and they have 6, that’s 1 for us. A captain counts twice.</p>
     <div class="sk-plg">${col(net.filter(o => o.d > 0), 'Us', true, us.missing)}${col(net.filter(o => o.d < 0), 'Them', false, them.missing)}</div>
   </div>`;
 }
